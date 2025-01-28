@@ -18,9 +18,7 @@ git config --global user.name "build"
 git config --global user.email "2722707908@qq.com"
 
 # 安装repo工具
-curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
-chmod a+x ~/repo
-sudo mv ~/repo /usr/local/bin/repo
+sudo apt-get install repo
 
 # 清理旧构建
 rm -rf kernel_workspace
