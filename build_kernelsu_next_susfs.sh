@@ -161,7 +161,7 @@ echo
 echo "==> [7/9] 开始编译内核"
 
 # 关键修复步骤：进入 kernel_platform 目录执行编译
-cd kernel_workspace/kernel_platform
+cd /home/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform
 
 # 清理旧编译结果
 rm -rf out
