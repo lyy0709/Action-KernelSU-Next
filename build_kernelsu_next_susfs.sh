@@ -128,18 +128,19 @@ cd ..
 echo
 echo "==> [6/9] 设置 susfs 及相关补丁"
 
+# 进入内核平台目录
+cd kernel_workspace/kernel_platform
+
 # 清理旧配置
-cd ../..
-rm -rf kernel_workspace/susfs4ksu kernel_workspace/kernel_patches
+rm -rf ../../susfs4ksu ../../kernel_patches
 
 # 克隆最新配置
 git clone "https://gitlab.com/simonpunk/susfs4ksu.git" \
     -b "gki-${ANDROID_VERSION}-${KERNEL_VERSION}" \
-    kernel_workspace/susfs4ksu
-git clone https://github.com/TheWildJames/kernel_patches.git kernel_workspace/kernel_patches
+    ../../susfs4ksu
+git clone https://github.com/TheWildJames/kernel_patches.git ../../kernel_patches
 
 # 应用补丁
-cd kernel_workspace/kernel_platform
 cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch KernelSU-Next/
 cp ../../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch common/
 cp ../../susfs4ksu/kernel_patches/fs/* common/fs/
@@ -159,10 +160,9 @@ patch -p1 -F 3 < 69_hide_stuff.patch || true
 echo
 echo "==> [7/9] 开始编译内核"
 
-# 清理旧编译结果
-rm -rf out
-
+# 确保在 kernel_platform 目录下执行编译
 cd ..
+rm -rf out
 ./oplus/build/oplus_build_kernel.sh "$CPUD" gki
 
 #---------------------------#
