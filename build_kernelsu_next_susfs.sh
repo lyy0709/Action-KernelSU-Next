@@ -165,27 +165,9 @@ cd /home/lyy0709/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform
 
 # 清理旧编译结果
 rm -rf out
-
-# 修复依赖文件路径问题
-if [ ! -f "vendor/oplus/kernel/prebuilt/vendorsetup.sh" ]; then
-  mkdir -p vendor/oplus/kernel/prebuilt
-  curl -s "https://raw.githubusercontent.com/OnePlusOSS/vendor_oneplus_prebuilt/main/vendorsetup.sh" \
-       -o vendor/oplus/kernel/prebuilt/vendorsetup.sh
-fi
-
-if [ ! -f "build/android/prepare_vendor.sh" ]; then
-  mkdir -p build/android
-  curl -s "https://raw.githubusercontent.com/OnePlusOSS/kernel_build_scripts/main/prepare_vendor.sh" \
-       -o build/android/prepare_vendor.sh
-  chmod +x build/android/prepare_vendor.sh
-fi
-
-# 修复时间记录函数（原脚本中的未定义变量）
-build_start_time() { date +%s; }
-build_end_time() { date +%s; }
-
-# 执行编译命令
-./oplus/build/oplus_build_kernel.sh "$CPUD" gki
+cd ..
+# 同级目录里有 ./oplus/build/oplus_build_kernel.sh
+./kernel_platform/oplus/build/oplus_build_kernel.sh "$CPUD" gki
 
 #---------------------------#
 #     8. 打包 AnyKernel3    #
