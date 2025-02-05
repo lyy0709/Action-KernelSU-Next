@@ -79,7 +79,7 @@ echo "==> [4/9] 检查并同步源码"
 if [ ! -d "kernel_workspace" ]; then
   echo "--> 首次运行，正在初始化仓库..."
   mkdir kernel_workspace
-  cd /home/kernelsu/Action-KernelSU-Next/kernel_workspace
+  cd /home/lyy0709/kernelsu/Action-KernelSU-Next/kernel_workspace
 
   # 初始化 repo
   repo init \
@@ -97,7 +97,7 @@ fi
 
 # 公共清理操作（每次运行都执行）
 echo "--> 清理旧编译配置..."
-cd /home/kernelsu/Action-KernelSU-Next/kernel_workspace
+cd /home/lyy0709/kernelsu/Action-KernelSU-Next/kernel_workspace
 rm -f common/android/abi_gki_protected_exports_* 2>/dev/null
 rm -f msm-kernel/android/abi_gki_protected_exports_* 2>/dev/null
 sed -i 's/ -dirty//g' common/scripts/setlocalversion 2>/dev/null || true
@@ -111,9 +111,9 @@ echo
 echo "==> [5/9] 设置 KernelSU-Next"
 
 # 清理旧版本KSU
-rm -rf kernel_workspace/kernel_platform/KernelSU-Next
+rm -rf /home/lyy0709/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform/KernelSU-Next
 
-cd /home/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform
+cd /home/lyy0709/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform
 curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
 cd KernelSU-Next
@@ -129,7 +129,7 @@ echo
 echo "==> [6/9] 设置 susfs 及相关补丁"
 
 # 进入内核平台目录
-cd /home/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform
+cd /home/lyy0709/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform
 
 # 清理旧配置
 rm -rf ../../susfs4ksu ../../kernel_patches
@@ -161,7 +161,7 @@ echo
 echo "==> [7/9] 开始编译内核"
 
 # 关键修复步骤：进入 kernel_platform 目录执行编译
-cd /home/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform
+cd /home/lyy0709/kernelsu/Action-KernelSU-Next/kernel_workspace/kernel_platform
 
 # 清理旧编译结果
 rm -rf out
