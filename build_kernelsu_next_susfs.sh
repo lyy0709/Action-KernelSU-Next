@@ -73,30 +73,36 @@ fi
 #     4. 初始化 & 同步源码  #
 #---------------------------#
 echo
-echo "==> [4/9] 初始化并同步源码"
+echo "==> [4/9] 检查并同步源码"
 
-# 若有旧的 kernel_workspace，先删除
-rm -rf kernel_workspace
-mkdir kernel_workspace
+# 仅在首次运行时初始化仓库
+if [ ! -d "kernel_workspace" ]; then
+  echo "--> 首次运行，正在初始化仓库..."
+  mkdir kernel_workspace
+  cd kernel_workspace
+
+  # 初始化 repo
+  repo init \
+      -u "https://github.com/OnePlusOSS/kernel_manifest.git" \
+      -b "refs/heads/oneplus/${CPU}" \
+      -m "${FEIL}.xml" \
+      --depth=1
+
+  # 同步代码（约5GB）
+  repo sync
+  cd ..
+else
+  echo "--> 检测到已有源码目录，跳过同步步骤..."
+fi
+
+# 公共清理操作（每次运行都执行）
+echo "--> 清理旧编译配置..."
 cd kernel_workspace
-
-# 初始化 repo
-repo init \
-    -u "https://github.com/OnePlusOSS/kernel_manifest.git" \
-    -b "refs/heads/oneplus/${CPU}" \
-    -m "${FEIL}.xml" \
-    --depth=1
-
-# 同步
-repo sync
-
-# 删除 abi_gki_protected_exports_*
-rm common/android/abi_gki_protected_exports_* 2>/dev/null || echo "No protected exports in common."
-rm msm-kernel/android/abi_gki_protected_exports_* 2>/dev/null || echo "No protected exports in msm-kernel."
-
-# 去掉 -dirty
+rm -f common/android/abi_gki_protected_exports_* 2>/dev/null
+rm -f msm-kernel/android/abi_gki_protected_exports_* 2>/dev/null
 sed -i 's/ -dirty//g' common/scripts/setlocalversion 2>/dev/null || true
 sed -i 's/ -dirty//g' msm-kernel/scripts/setlocalversion 2>/dev/null || true
+cd ..
 
 #---------------------------#
 #     5. 设置 KernelSU Next #
@@ -104,19 +110,16 @@ sed -i 's/ -dirty//g' msm-kernel/scripts/setlocalversion 2>/dev/null || true
 echo
 echo "==> [5/9] 设置 KernelSU-Next"
 
-cd kernel_platform
+# 清理旧版本KSU
+rm -rf kernel_workspace/kernel_platform/KernelSU-Next
+
+cd kernel_workspace/kernel_platform
 curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
 cd KernelSU-Next
-
-# 计算 KSU 版本（可根据实际情况自行调整计算逻辑）
 KSU_VERSION=$(expr $(git rev-list --count HEAD) + 10200)
 echo "KSU_VERSION: $KSU_VERSION"
-
-# 替换 Makefile 中的 DKSU_VERSION (默认脚本中原来为 16，这里直接修改)
 sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
-
-# 返回到 kernel_platform
 cd ..
 
 #---------------------------#
@@ -125,54 +128,30 @@ cd ..
 echo
 echo "==> [6/9] 设置 susfs 及相关补丁"
 
-cd ..
+# 清理旧配置
+cd ../..
+rm -rf kernel_workspace/susfs4ksu kernel_workspace/kernel_patches
 
-# 克隆 susfs4ksu
+# 克隆最新配置
 git clone "https://gitlab.com/simonpunk/susfs4ksu.git" \
     -b "gki-${ANDROID_VERSION}-${KERNEL_VERSION}" \
-    susfs4ksu
+    kernel_workspace/susfs4ksu
+git clone https://github.com/TheWildJames/kernel_patches.git kernel_workspace/kernel_patches
 
-# 克隆其他可能需要的内核补丁
-git clone https://github.com/TheWildJames/kernel_patches.git
+# 应用补丁
+cd kernel_workspace/kernel_platform
+cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch KernelSU-Next/
+cp ../../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch common/
+cp ../../susfs4ksu/kernel_patches/fs/* common/fs/
+cp ../../susfs4ksu/kernel_patches/include/linux/* common/include/linux/
 
-cd kernel_platform
-
-# 拷贝并应用补丁
-cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch KernelSU-Next/
-cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch common/
-cp ../susfs4ksu/kernel_patches/fs/* common/fs/
-cp ../susfs4ksu/kernel_patches/include/linux/* common/include/linux/
-
-echo "----> 应用 10_enable_susfs_for_ksu.patch"
+echo "--> 应用内核补丁..."
 cd KernelSU-Next
 patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
-cd ..
-
-echo "----> 应用 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch"
-cd common
+cd ../common
 patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || true
-
-# 拷贝并应用 69_hide_stuff.patch
-cp ../../kernel_patches/69_hide_stuff.patch ./
+cp ../../../kernel_patches/69_hide_stuff.patch ./
 patch -p1 -F 3 < 69_hide_stuff.patch || true
-
-# 提交修改（可选，若需保留本地提交记录的话）
-git add -A && git commit -a -m "BUILD Kernel patches applied" || true
-
-cd ../msm-kernel
-git add -A && git commit -a -m "BUILD Kernel" || true
-cd ..
-
-# 回到 kernel_platform 根目录
-# 应用另外的补丁
-cp ../kernel_patches/apk_sign.c_fix.patch ./
-patch -p1 -F 3 < apk_sign.c_fix.patch || true
-
-cp ../kernel_patches/core_hook.c_fix.patch ./
-patch -p1 --fuzz=3 < ./core_hook.c_fix.patch || true
-
-cp ../kernel_patches/selinux.c_fix.patch ./
-patch -p1 -F 3 < selinux.c_fix.patch || true
 
 #---------------------------#
 #     7. 编译内核           #
@@ -180,9 +159,11 @@ patch -p1 -F 3 < selinux.c_fix.patch || true
 echo
 echo "==> [7/9] 开始编译内核"
 
+# 清理旧编译结果
+rm -rf out
+
 cd ..
-# 同级目录里有 ./oplus/build/oplus_build_kernel.sh
-./kernel_platform/oplus/build/oplus_build_kernel.sh "$CPUD" gki
+./oplus/build/oplus_build_kernel.sh "$CPUD" gki
 
 #---------------------------#
 #     8. 打包 AnyKernel3    #
@@ -190,23 +171,22 @@ cd ..
 echo
 echo "==> [8/9] 打包 AnyKernel3"
 
-git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
-rm -rf ./AnyKernel3/.git
+# 清理旧打包文件
+rm -rf ../AnyKernel3
+git clone https://github.com/Kernel-SU/AnyKernel3 ../AnyKernel3 --depth=1
+rm -rf ../AnyKernel3/.git
 
-# 将编译生成的 Image 放入 AnyKernel3 目录
-cp kernel_platform/out/msm-kernel-"${CPUD}"-gki/dist/Image ./AnyKernel3/
-
-# 生成最终的打包文件（简单示例，可自行修改 zip 名称）
-cd AnyKernel3
+# 生成最终包
+cp out/msm-kernel-"${CPUD}"-gki/dist/Image ../AnyKernel3/
+cd ../AnyKernel3
 zip -r9 "../AnyKernel3_KernelSU_Next_${KSU_VERSION}_${FEIL}.zip" ./*
-cd ..
 
 #---------------------------#
 #     9. 收尾/结果查看      #
 #---------------------------#
 echo
 echo "==> [9/9] 编译完成，结果存放在以下位置："
-echo "    1) 内核 zImage/Image: kernel_platform/out/msm-kernel-${CPUD}-gki/dist/Image"
-echo "    2) 可直接刷入设备的刷机包: AnyKernel3_KernelSU_Next_${KSU_VERSION}_${FEIL}.zip"
+echo "    1) 内核 zImage/Image: kernel_workspace/kernel_platform/out/msm-kernel-${CPUD}-gki/dist/Image"
+echo "    2) 可直接刷入设备的刷机包: $(pwd)/../AnyKernel3_KernelSU_Next_${KSU_VERSION}_${FEIL}.zip"
 echo
 echo "脚本执行完毕。"
