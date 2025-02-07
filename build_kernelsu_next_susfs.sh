@@ -89,14 +89,12 @@ repo init \
 
 # 同步
 repo sync
-
-# 删除 abi_gki_protected_exports_*
-rm common/android/abi_gki_protected_exports_* 2>/dev/null || echo "No protected exports in common."
-rm msm-kernel/android/abi_gki_protected_exports_* 2>/dev/null || echo "No protected exports in msm-kernel."
-
-# 去掉 -dirty
-sed -i 's/ -dirty//g' common/scripts/setlocalversion 2>/dev/null || true
-sed -i 's/ -dirty//g' msm-kernel/scripts/setlocalversion 2>/dev/null || true
+rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
+rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
+sed -i 's/ -dirty//g' kernel_platform/common/scripts/setlocalversion
+sed -i 's/ -dirty//g' kernel_platform/msm-kernel/scripts/setlocalversion
+sed -i '$s|echo "\$res"|echo "$res-Mortis"|' kernel_platform/common/scripts/setlocalversion            
+sed -i '$s|echo "\$res"|echo "$res-Mortis"|' kernel_platform/msm-kernel/scripts/setlocalversion
 
 #---------------------------#
 #     5. 设置 KernelSU Next #
@@ -130,7 +128,6 @@ cd ..
 # 克隆 susfs4ksu
 git clone "https://gitlab.com/simonpunk/susfs4ksu.git" \
     -b "gki-${ANDROID_VERSION}-${KERNEL_VERSION}" \
-    susfs4ksu
 
 # 克隆其他可能需要的内核补丁
 git clone https://github.com/TheWildJames/kernel_patches.git
@@ -146,7 +143,7 @@ cp ../susfs4ksu/kernel_patches/include/linux/* common/include/linux/
 
 echo "----> 应用 KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch"
 cd KernelSU-Next
-patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
+patch -p1 < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
 cd ..
 
 echo "----> 应用 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch"
@@ -156,16 +153,6 @@ patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || tr
 # 拷贝并应用 69_hide_stuff.patch
 cp ../../kernel_patches/69_hide_stuff.patch ./
 patch -p1 -F 3 < 69_hide_stuff.patch || true
-
-# 提交修改（可选，若需保留本地提交记录的话）
-git add -A && git commit -a -m "BUILD Kernel patches applied" || true
-
-cd ../msm-kernel
-git add -A && git commit -a -m "BUILD Kernel" || true
-cd ..
-
-# 回到 kernel_platform 根目录
-# 应用另外的补丁
 
 cp ../kernel_patches/apk_sign.c_fix.patch ./
 patch -p1 -F 3 < apk_sign.c_fix.patch || true
@@ -183,7 +170,6 @@ echo
 echo "==> [7/9] 开始编译内核"
 
 cd ..
-export LTO=full
 # 同级目录里有 ./oplus/build/oplus_build_kernel.sh
 ./kernel_platform/oplus/build/oplus_build_kernel.sh "$CPUD" gki
 
