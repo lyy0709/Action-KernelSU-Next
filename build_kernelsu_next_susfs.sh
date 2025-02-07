@@ -139,19 +139,17 @@ git clone https://github.com/TheWildJames/kernel_patches.git
 cd kernel_platform
 
 # 拷贝并应用补丁
-cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch KernelSU-Next/
-cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch common/
-cp ../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch KernelSU-Next/
-cp ../susfs4ksu/kernel_patches/fs/* common/fs/
-cp ../susfs4ksu/kernel_patches/include/linux/* common/include/linux/
+cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch ./common/
+cp ../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./KernelSU-Next/
+cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
+cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
 
 echo "----> 应用 KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch"
-cd KernelSU-Next
-patch -p1 < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
-cd ..
+cd ./KernelSU-Next
+patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
 
 echo "----> 应用 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch"
-cd common
+cd ../common
 patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || true
 
 # 拷贝并应用 69_hide_stuff.patch
@@ -163,14 +161,14 @@ cd ..
 cd ./msm-kernel && git add -A && git commit -a -m "BUILD Kernel"
 cd ..
 
-cp ../kernel_patches/apk_sign.c_fix.patch ./
-patch -p1 -F 3 < apk_sign.c_fix.patch || true
+# cp ../kernel_patches/apk_sign.c_fix.patch ./
+# patch -p1 -F 3 < apk_sign.c_fix.patch || true
 
-cp ../kernel_patches/core_hook.c_fix.patch ./
-patch -p1 -F 3 < core_hook.c_fix.patch || true
+# cp ../kernel_patches/core_hook.c_fix.patch ./
+# patch -p1 -F 3 < core_hook.c_fix.patch || true
 
-cp ../kernel_patches/selinux.c_fix.patch ./
-patch -p1 -F 3 < selinux.c_fix.patch || true
+# cp ../kernel_patches/selinux.c_fix.patch ./
+# patch -p1 -F 3 < selinux.c_fix.patch || true
 
 #---------------------------#
 #     7. 编译内核           #
