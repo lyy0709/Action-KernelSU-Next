@@ -165,11 +165,14 @@ cd ..
 
 # 回到 kernel_platform 根目录
 # 应用另外的补丁
+cp ../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./
+patch -p1 -F 3 < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
+
 cp ../kernel_patches/apk_sign.c_fix.patch ./
 patch -p1 -F 3 < apk_sign.c_fix.patch || true
 
 cp ../kernel_patches/core_hook.c_fix.patch ./
-patch -p1 --fuzz=3 < ./core_hook.c_fix.patch || true
+patch -p1 -F 3 < core_hook.c_fix.patch || true
 
 cp ../kernel_patches/selinux.c_fix.patch ./
 patch -p1 -F 3 < selinux.c_fix.patch || true
