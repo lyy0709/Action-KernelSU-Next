@@ -89,12 +89,16 @@ repo init \
 
 # 同步
 repo sync
-rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
-rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
-sed -i 's/ -dirty//g' kernel_platform/common/scripts/setlocalversion
-sed -i 's/ -dirty//g' kernel_platform/msm-kernel/scripts/setlocalversion
-sed -i '$s|echo "\$res"|echo "$res-Mortis"|' kernel_platform/common/scripts/setlocalversion            
-sed -i '$s|echo "\$res"|echo "$res-Mortis"|' kernel_platform/msm-kernel/scripts/setlocalversion
+# 删除 abi_gki_protected_exports_*
+rm kernel_platform/common/android/abi_gki_protected_exports_* 2>/dev/null || echo "No protected exports in common."
+rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* 2>/dev/null || echo "No protected exports in msm-kernel."
+
+# 去掉 -dirty
+sed -i 's/ -dirty//g' common/scripts/setlocalversion 2>/dev/null || true
+sed -i 's/ -dirty//g' msm-kernel/scripts/setlocalversion 2>/dev/null || true
+
+sed -i '$s|echo "\$res"|echo "$res-Mortis"|' kernel_platform/common/scripts/setlocalversion 2>/dev/null || true            
+sed -i '$s|echo "\$res"|echo "$res-Mortis"|' kernel_platform/msm-kernel/scripts/setlocalversion 2>/dev/null || true
 
 #---------------------------#
 #     5. 设置 KernelSU Next #
@@ -154,13 +158,18 @@ patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || tr
 cp ../../kernel_patches/69_hide_stuff.patch ./
 patch -p1 -F 3 < 69_hide_stuff.patch || true
 
-cp ../../kernel_patches/apk_sign.c_fix.patch ./
+git add -A && git commit -a -m "BUILD Kernel"
+cd ..
+cd ./msm-kernel && git add -A && git commit -a -m "BUILD Kernel"
+cd ..
+
+cp ../kernel_patches/apk_sign.c_fix.patch ./
 patch -p1 -F 3 < apk_sign.c_fix.patch || true
 
-cp ../../kernel_patches/core_hook.c_fix.patch ./
+cp ../kernel_patches/core_hook.c_fix.patch ./
 patch -p1 -F 3 < core_hook.c_fix.patch || true
 
-cp ../../kernel_patches/selinux.c_fix.patch ./
+cp ../kernel_patches/selinux.c_fix.patch ./
 patch -p1 -F 3 < selinux.c_fix.patch || true
 
 #---------------------------#
