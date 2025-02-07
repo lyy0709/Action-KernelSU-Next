@@ -154,13 +154,13 @@ patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || tr
 cp ../../kernel_patches/69_hide_stuff.patch ./
 patch -p1 -F 3 < 69_hide_stuff.patch || true
 
-cp ../kernel_patches/apk_sign.c_fix.patch ./
+cp ../../kernel_patches/apk_sign.c_fix.patch ./
 patch -p1 -F 3 < apk_sign.c_fix.patch || true
 
-cp ../kernel_patches/core_hook.c_fix.patch ./
+cp ../../kernel_patches/core_hook.c_fix.patch ./
 patch -p1 -F 3 < core_hook.c_fix.patch || true
 
-cp ../kernel_patches/selinux.c_fix.patch ./
+cp ../../kernel_patches/selinux.c_fix.patch ./
 patch -p1 -F 3 < selinux.c_fix.patch || true
 
 #---------------------------#
