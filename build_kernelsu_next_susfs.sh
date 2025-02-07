@@ -140,12 +140,13 @@ cd kernel_platform
 # 拷贝并应用补丁
 cp ../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch KernelSU-Next/
 cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch common/
+cp ../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch KernelSU-Next/
 cp ../susfs4ksu/kernel_patches/fs/* common/fs/
 cp ../susfs4ksu/kernel_patches/include/linux/* common/include/linux/
 
-echo "----> 应用 10_enable_susfs_for_ksu.patch"
+echo "----> 应用 KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch"
 cd KernelSU-Next
-patch -p1 --forward < 10_enable_susfs_for_ksu.patch || true
+patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
 cd ..
 
 echo "----> 应用 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch"
@@ -165,8 +166,6 @@ cd ..
 
 # 回到 kernel_platform 根目录
 # 应用另外的补丁
-cp ../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./
-patch -p1 -F 3 < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
 
 cp ../kernel_patches/apk_sign.c_fix.patch ./
 patch -p1 -F 3 < apk_sign.c_fix.patch || true
@@ -184,6 +183,7 @@ echo
 echo "==> [7/9] 开始编译内核"
 
 cd ..
+export LTO=full
 # 同级目录里有 ./oplus/build/oplus_build_kernel.sh
 ./kernel_platform/oplus/build/oplus_build_kernel.sh "$CPUD" gki
 
