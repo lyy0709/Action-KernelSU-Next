@@ -97,9 +97,6 @@ rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* 2>/dev/null ||
 sed -i 's/ -dirty//g' common/scripts/setlocalversion 2>/dev/null || true
 sed -i 's/ -dirty//g' msm-kernel/scripts/setlocalversion 2>/dev/null || true
 
-sed -i '$s|echo "\$res"|echo "$res-Mortis"|' kernel_platform/common/scripts/setlocalversion 2>/dev/null || true            
-sed -i '$s|echo "\$res"|echo "$res-Mortis"|' kernel_platform/msm-kernel/scripts/setlocalversion 2>/dev/null || true
-
 #---------------------------#
 #     5. 设置 KernelSU Next #
 #---------------------------#
@@ -140,13 +137,13 @@ cd kernel_platform
 
 # 拷贝并应用补丁
 cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch ./common/
-cp ../kernel_patches/KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch ./KernelSU-Next/
+cp ../kernel_patches/0001-kernel-patch-susfs-v1.5.5-to-KernelSU-Next-v1.0.5.patch ./KernelSU-Next/
 cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
 cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
 
-echo "----> 应用 KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch"
+echo "----> 应用 0001-kernel-patch-susfs-v1.5.5-to-KernelSU-Next-v1.0.5.patch"
 cd ./KernelSU-Next
-patch -p1 --forward < KernelSU-Next-Implement-SUSFS-v1.5.5-Universal.patch || true
+patch -p1 --forward < 0001-kernel-patch-susfs-v1.5.5-to-KernelSU-Next-v1.0.5.patch || true
 
 echo "----> 应用 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch"
 cd ../common
