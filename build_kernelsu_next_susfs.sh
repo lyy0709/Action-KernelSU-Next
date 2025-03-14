@@ -2,7 +2,7 @@
 #
 # 本脚本用于在本地 Ubuntu 系统上进行内核编译，逻辑参考自给定的 GitHub Actions workflow。
 # 修复了与 GitHub Actions 工作流的差异，解决可能导致编译错误的问题。
-#
+# 来源于lyy0709
 # 传参说明：
 #   1) CPU             - 对应在上游Manifest中的分支 (如 sm8550)
 #   2) FEIL            - 对应的 xml 配置文件名称 (如 oneplus_11_v)
