@@ -122,12 +122,8 @@ cd KernelSU-Next
 KSU_VERSION=$(expr $(git rev-list --count HEAD) + 10200)
 echo "KSU_VERSION: $KSU_VERSION"
 
-# 先检查实际的默认值
-ACTUAL_VERSION=$(grep "DKSU_VERSION" kernel/Makefile | grep -o "[0-9]*")
-echo "检测到的 DKSU_VERSION 默认值: $ACTUAL_VERSION"
-
-# 使用通用的替换方式，避免硬编码默认值
-sed -i "s/DKSU_VERSION=[0-9]*/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
+# 使用硬编码的默认值进行替换
+sed -i "s/DKSU_VERSION=11998/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
 
 # 返回到 kernel_platform
 cd ..
