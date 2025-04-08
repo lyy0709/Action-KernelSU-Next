@@ -87,7 +87,7 @@ cd kernel_workspace
 
 # 初始化 repo
 repo init \
-    -u "https://github.com/OnePlusOSS/kernel_manifest.git" \
+    -u "https://github.com/lyy0709/kernel_manifest.git" \
     -b "refs/heads/oneplus/${CPU}" \
     -m "${FEIL}.xml" \
     --depth=1
