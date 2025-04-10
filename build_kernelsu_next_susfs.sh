@@ -87,7 +87,7 @@ cd kernel_workspace
 
 # 初始化 repo
 repo init \
-    -u "https://github.com/lyy0709/kernel_manifest.git" \
+    -u "https://github.com/OnePlusOSS/kernel_manifest.git" \
     -b "refs/heads/oneplus/${CPU}" \
     -m "${FEIL}.xml" \
     --depth=1
@@ -165,9 +165,6 @@ patch -p1 < 50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || tr
 cp ../../kernel_patches/69_hide_stuff.patch ./
 patch -p1 -F 3 < 69_hide_stuff.patch || true
 patch -p1 -F 3 < syscall_hooks.patch || true
-
-patch -p1 < ../../.repo/manifests/patches/001-lz4.patch
-patch -p1 < ../../.repo/manifests/patches/002-zstd.patch
 
 #---------------------------#
 #     7. 应用配置           #
