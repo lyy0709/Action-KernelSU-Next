@@ -171,7 +171,7 @@ fi
 
 # 步骤4: 初始化repo并同步
 print_info "初始化repo并同步..."
-mkdir -p kernel_workspace && cd kernel_workspace
+rm -rf kernel_workspace && mkdir -p kernel_workspace && cd kernel_workspace
 repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/$CPU -m $FEIL.xml --depth=1
 repo sync
 
