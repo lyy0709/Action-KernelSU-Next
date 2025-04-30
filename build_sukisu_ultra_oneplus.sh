@@ -166,7 +166,24 @@ if ! command -v repo &> /dev/null; then
     chmod a+x ~/repo
     sudo mv ~/repo /usr/local/bin/repo
 else
-    print_info "repo工具已安装，跳过..."
+    print_info "repo工具已安装，检查更新..."
+    # 创建临时目录并初始化repo以检查版本
+    TEMP_DIR=$(mktemp -d)
+    cd $TEMP_DIR
+    repo init >/dev/null 2>&1 || true
+    
+    if [ -f .repo/repo/repo ]; then
+        NEW_REPO=$(readlink -f .repo/repo/repo)
+        if [ -f "$NEW_REPO" ]; then
+            print_info "发现新版本，正在更新repo..."
+            sudo cp "$NEW_REPO" /usr/local/bin/repo
+            print_success "repo更新完成"
+        fi
+    fi
+    
+    # 清理临时目录
+    cd - >/dev/null
+    rm -rf $TEMP_DIR
 fi
 
 # 步骤4: 初始化repo并同步
