@@ -45,6 +45,7 @@ show_help() {
     echo "  --susfs-ci BOOL        SUSFS模块下载是否调用CI (true, false)"
     echo "  --lz4 BOOL             是否启用lz4 (true, false)"
     echo "  --vfs BOOL             是否启用VFS (true, false)"
+    echo "  --kpm BOOL             是否启用KPM (true, false)"
     echo "  --help                 显示此帮助信息"
     echo ""
     echo "示例: $0 --cpu sm8550 --feil oneplus_ace2pro_v --cpud kalama --android-version android13 --kernel-version 5.15 --build-method gki --susfs-ci true --lz4 false --vfs true"
@@ -61,7 +62,7 @@ BUILD_METHOD="gki"
 SUSFS_CI="true"
 LZ4="false"
 VFS="true"
-
+KPM="true"
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -402,15 +403,17 @@ if [ "$CPUD" = "sm8750" ]; then
     done
 fi
 
-# 步骤13: 应用 patch_linux 并替换 Image
-print_info "应用 patch_linux 并替换 Image..."
-cd $WORKSPACE/kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/dist
-curl -LO https://raw.githubusercontent.com/Numbersf/Action-Build/main/patch_linux
-chmod +x patch_linux
-./patch_linux
-rm -f Image
-mv oImage Image
-cp Image $WORKSPACE/AnyKernel3/Image
+if [ "$KPM" = "true" ]; then
+    # 步骤13: 应用 patch_linux 并替换 Image
+    print_info "应用 patch_linux 并替换 Image..."
+    cd $WORKSPACE/kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/dist
+    curl -LO https://raw.githubusercontent.com/Numbersf/Action-Build/main/patch_linux
+    chmod +x patch_linux
+    ./patch_linux
+    rm -f Image
+    mv oImage Image
+    cp Image $WORKSPACE/AnyKernel3/Image
+fi
 
 # 步骤14: 下载 SUSFS 模块
 if [ "$SUSFS_CI" = "true" ]; then
@@ -456,7 +459,9 @@ fi
 if [ "$LZ4" = "true" ]; then
     SUFFIX="${SUFFIX}_LZ4KD"
 fi
-
+if [ "$KPM" = "true" ]; then
+    SUFFIX="${SUFFIX}_KPM"
+fi
 # 清理FEIL名称
 FEIL_CLEAN="${FEIL}"
 FEIL_CLEAN="${FEIL_CLEAN%_v}"  # 去掉结尾的 _v（如果有）
@@ -464,7 +469,7 @@ FEIL_CLEAN="${FEIL_CLEAN%_u}"  # 去掉结尾的 _u（如果有）
 
 # 创建最终ZIP
 cd $WORKSPACE/AnyKernel3
-zip -r9 ../AnyKernel3_SukiSUUltra_${KSU_VERSION}_${FEIL_CLEAN}_KPM${SUFFIX}.zip *
+zip -r9 ../AnyKernel3_SukiSUUltra_${KSU_VERSION}_${FEIL_CLEAN}_${SUFFIX}.zip *
 
 print_success "构建完成！"
-print_success "输出文件: $WORKSPACE/AnyKernel3_SukiSUUltra_${KSU_VERSION}_${FEIL_CLEAN}_KPM${SUFFIX}.zip"
+print_success "输出文件: $WORKSPACE/AnyKernel3_SukiSUUltra_${KSU_VERSION}_${FEIL_CLEAN}_${SUFFIX}.zip"
