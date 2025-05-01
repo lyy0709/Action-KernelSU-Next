@@ -102,6 +102,10 @@ while [[ $# -gt 0 ]]; do
             VFS="$2"
             shift 2
             ;;
+        --kpm)
+            KPM="$2"
+            shift 2
+            ;;
         --help)
             show_help
             ;;
@@ -133,7 +137,7 @@ validate_param "BUILD_METHOD" "$BUILD_METHOD" "gki,perf"
 validate_param "SUSFS_CI" "$SUSFS_CI" "true,false"
 validate_param "LZ4" "$LZ4" "true,false"
 validate_param "VFS" "$VFS" "true,false"
-
+validate_param "KPM" "$KPM" "true,false"
 # 显示选择的参数
 print_info "选择的参数:"
 echo "CPU: $CPU"
@@ -145,6 +149,7 @@ echo "BUILD_METHOD: $BUILD_METHOD"
 echo "SUSFS_CI: $SUSFS_CI"
 echo "LZ4: $LZ4"
 echo "VFS: $VFS"
+echo "KPM: $KPM"
 
 # 创建工作目录
 WORKSPACE=$(pwd)
