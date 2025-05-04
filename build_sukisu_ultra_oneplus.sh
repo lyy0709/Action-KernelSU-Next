@@ -354,6 +354,24 @@ if [ "$LZ4" = "true" ]; then
         rm "$WORKSPACE/kernel_workspace/kernel_platform/common/android/gki_aarch64_modules" || true
         touch "$WORKSPACE/kernel_workspace/kernel_platform/common/android/gki_aarch64_modules"
         print_info "5.15: 已修复zram&zsmalloc"
+        
+        # 禁用OPLUS特定的zsmalloc模块，避免符号重复导出
+        print_info "禁用OPLUS特定的zsmalloc模块以避免符号冲突..."
+        
+        # 方案1：创建空的源文件，编译时会跳过
+        if [ -d "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc" ]; then
+            echo "// 此模块已禁用，避免与内核内置zsmalloc符号冲突" > "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/oplus_bsp_zsmalloc.c"
+        fi
+        
+        # # 方案2：修改Makefile，不编译该模块（如果上面方法不起作用，可以尝试此方法）
+        # if [ -f "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/Makefile" ]; then
+        #     sed -i 's/obj-$(CONFIG_ZSMALLOC_THP).*/# 禁用oplus_bsp_zsmalloc以避免符号冲突/' "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/Makefile"
+        # fi
+        
+        # # 方案3：在源文件中注释掉导出符号的行
+        # if [ -f "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/oplus_bsp_zsmalloc.c" ]; then
+        #     sed -i 's/EXPORT_SYMBOL(zs_get_total_pages)/\/\/ EXPORT_SYMBOL(zs_get_total_pages) \/\/ 避免符号冲突/' "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/oplus_bsp_zsmalloc.c"
+        # fi
     fi
 
     if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
