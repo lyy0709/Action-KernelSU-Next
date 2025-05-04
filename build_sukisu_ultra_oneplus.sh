@@ -257,6 +257,10 @@ if [ "$VFS" = "true" ]; then
 fi
 
 if [ "$LZ4" = "true" ]; then
+    cp -r ../../SukiSU_patch/other/lz4k/include/linux/* ./include/linux/
+    cp -r ../../SukiSU_patch/other/lz4k/lib/* ./lib/
+    cp -r ../../SukiSU_patch/other/lz4k/crypto/* ./crypto/
+    
     cp ../../SukiSU_patch/other/lz4k_patch/$KERNEL_VERSION/lz4kd.patch ./
     echo "正在打lz4kd补丁"
     patch -p1 -F 3 < lz4kd.patch || true
@@ -320,14 +324,30 @@ if [ "$LZ4" = "true" ]; then
     fi
 
     if [ "$KERNEL_VERSION" != "6.6" ] && [ "$KERNEL_VERSION" != "5.10" ]; then
-        sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' "$CONFIG_FILE"
-        sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' "$CONFIG_FILE"
+        if grep -q "CONFIG_ZSMALLOC" -- "$CONFIG_FILE"; then
+            print_info "提示：文件 $CONFIG_FILE 包含字符串 CONFIG_ZSMALLOC。"
+            sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' "$CONFIG_FILE"
+        else
+            print_warning "警告：文件 $CONFIG_FILE 不包含字符串 CONFIG_ZSMALLOC。"
+            echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
+        fi
+            
         sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
     fi
 
     if [ "$KERNEL_VERSION" = "6.6" ]; then
         echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
         sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
+    fi
+
+    if [ "$ANDROID_VERSION" = "android14" ] || [ "$ANDROID_VERSION" = "android15" ]; then
+        sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$WORKSPACE/kernel_workspace/kernel_platform/common/modules.bzl"
+        echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
+        print_info "Android14_Bazel: 已修复zram&zsmalloc"
+    elif [ "$KERNEL_VERSION" = "5.15" ]; then
+        rm "$WORKSPACE/kernel_workspace/kernel_platform/common/android/gki_aarch64_modules" || true
+        touch "$WORKSPACE/kernel_workspace/kernel_platform/common/android/gki_aarch64_modules"
+        print_info "5.15: 已修复zram&zsmalloc"
     fi
 
     if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
