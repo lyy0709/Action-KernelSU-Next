@@ -64,7 +64,7 @@ SUSFS_CI="true"
 LZ4="false"
 VFS="true"
 KPM="true"
-DISABLE_OPLUS_ZS="false"
+DISABLE_OPLUS_ZS="true"
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     case $1 in
