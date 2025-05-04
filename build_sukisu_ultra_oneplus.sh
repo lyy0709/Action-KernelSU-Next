@@ -379,21 +379,51 @@ if [ "$DISABLE_OPLUS_ZS" = "true" ]; then
     print_info "禁用 OPLUS zsmalloc 模块..."
 
     # 查找并禁用 OPLUS zsmalloc 模块的 Kconfig
-    OPLUS_ZSMALLOC_KCONFIG=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "Kconfig" -exec grep -l "oplus_bsp_zsmalloc" {} \;)
+    OPLUS_ZSMALLOC_KCONFIG=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "Kconfig" -exec grep -l "oplus_bsp_zsmalloc\|OPLUS_FEATURE_ZSMALLOC" {} \;)
     if [ -n "$OPLUS_ZSMALLOC_KCONFIG" ]; then
         for kconfig in $OPLUS_ZSMALLOC_KCONFIG; do
             print_info "修改 Kconfig 文件: $kconfig"
             sed -i 's/source ".*oplus_bsp_zsmalloc.*"/# source "mm\/oplus_mm\/thp_zsmalloc\/Kconfig" # 已禁用/g' "$kconfig"
+            sed -i 's/source ".*OPLUS_FEATURE_ZSMALLOC.*"/# source "mm\/oplus_mm\/thp_zsmalloc\/Kconfig" # 已禁用/g' "$kconfig"
         done
     fi
 
     # 查找并禁用 OPLUS zsmalloc 模块的 Makefile
-    OPLUS_ZSMALLOC_MAKEFILE=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "Makefile" -exec grep -l "oplus_bsp_zsmalloc" {} \;)
+    OPLUS_ZSMALLOC_MAKEFILE=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "Makefile" -exec grep -l "oplus_bsp_zsmalloc\|OPLUS_FEATURE_ZSMALLOC" {} \;)
     if [ -n "$OPLUS_ZSMALLOC_MAKEFILE" ]; then
         for makefile in $OPLUS_ZSMALLOC_MAKEFILE; do
             print_info "修改 Makefile 文件: $makefile"
             sed -i 's/obj-$(CONFIG_OPLUS_FEATURE_ZSMALLOC).*$/# obj-$(CONFIG_OPLUS_FEATURE_ZSMALLOC) += thp_zsmalloc\/ # 已禁用/g' "$makefile"
         done
+    fi
+
+    # 直接删除相关目录文件
+    OPLUS_ZSMALLOC_PATH="$WORKSPACE/kernel_workspace/kernel_platform/oplus/kernel/mm/thp_zsmalloc"
+    if [ -d "$OPLUS_ZSMALLOC_PATH" ]; then
+        print_info "尝试重命名 OPLUS zsmalloc 目录: $OPLUS_ZSMALLOC_PATH"
+        mv "$OPLUS_ZSMALLOC_PATH" "${OPLUS_ZSMALLOC_PATH}_disabled" || true
+    fi
+
+    # 寻找所有可能的OPLUS thp_zsmalloc路径
+    for POTENTIAL_PATH in $(find "$WORKSPACE/kernel_workspace/kernel_platform" -path "*/mm/oplus_mm/thp_zsmalloc" -type d); do
+        if [ -d "$POTENTIAL_PATH" ]; then
+            print_info "找到OPLUS zsmalloc路径: $POTENTIAL_PATH"
+            # 备份原始文件
+            cp -r "$POTENTIAL_PATH" "${POTENTIAL_PATH}_backup"
+            # 清空目录内容，保留目录结构
+            find "$POTENTIAL_PATH" -type f -name "*.c" -o -name "*.h" | while read file; do
+                echo "// 此文件已被禁用，以避免符号冲突" > "$file"
+            done
+            # 创建空的oplus_bsp_zsmalloc.c文件
+            echo "// 此文件已被禁用，以避免符号冲突" > "$POTENTIAL_PATH/oplus_bsp_zsmalloc.c"
+            print_info "已清空 $POTENTIAL_PATH 中的源文件"
+        fi
+    done
+
+    # 修改 CONFIG 文件，禁用相关配置
+    if [ -f "$CONFIG_FILE" ]; then
+        print_info "修改内核配置文件，禁用OPLUS_FEATURE_ZSMALLOC"
+        echo "# CONFIG_OPLUS_FEATURE_ZSMALLOC is not set" >> "$CONFIG_FILE"
     fi
 
     print_info "OPLUS zsmalloc 模块已禁用"
@@ -402,6 +432,51 @@ fi
 # 步骤11: 构建内核
 print_info "构建内核..."
 cd $WORKSPACE/kernel_workspace
+
+# 紧急修复：检查并禁用导致zs_get_total_pages冲突的模块
+print_info "执行预构建检查，防止符号冲突..."
+CONFLICT_MODULES=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -type d -path "*/mm/*zsmalloc*")
+if [ -n "$CONFLICT_MODULES" ]; then
+    print_info "发现可能冲突的zsmalloc模块:"
+    for module in $CONFLICT_MODULES; do
+        echo "  - $module"
+        
+        # 对每个可能冲突的模块进行处理
+        if [[ "$module" == *"oplus"* || "$module" == *"thp_zsmalloc"* ]]; then
+            print_info "处理OPLUS自定义zsmalloc模块: $module"
+            
+            # 创建一个简单的替代模块
+            if [ -d "$module" ]; then
+                # 备份模块目录
+                MODULE_BACKUP="${module}_original_backup"
+                if [ ! -d "$MODULE_BACKUP" ]; then
+                    cp -r "$module" "$MODULE_BACKUP"
+                fi
+                
+                # 创建空实现
+                rm -rf "$module"/*
+                mkdir -p "$module"
+                cat > "$module/dummy.c" << EOF
+// 空实现，防止zs_get_total_pages符号冲突
+#include <linux/module.h>
+#include <linux/kernel.h>
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Dummy module to prevent symbol conflicts");
+EOF
+            fi
+        fi
+    done
+fi
+
+# 紧急修复：检查内核配置中是否存在冲突配置
+KERNEL_CONFIG_FILES=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "*config*" -type f)
+for config in $KERNEL_CONFIG_FILES; do
+    if grep -q "CONFIG_OPLUS_FEATURE_ZSMALLOC" "$config"; then
+        print_info "在配置文件中禁用OPLUS_FEATURE_ZSMALLOC: $config"
+        sed -i 's/CONFIG_OPLUS_FEATURE_ZSMALLOC=.*/# CONFIG_OPLUS_FEATURE_ZSMALLOC is not set/' "$config"
+    fi
+done
+
 if [ "$CPU" = "sm8650" ] || [ "$CPU" = "sm7675" ]; then
     ./kernel_platform/build_with_bazel.py -t $CPUD $BUILD_METHOD
 else
