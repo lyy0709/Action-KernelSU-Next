@@ -46,6 +46,7 @@ show_help() {
     echo "  --lz4 BOOL             是否启用lz4 (true, false)"
     echo "  --vfs BOOL             是否启用VFS (true, false)"
     echo "  --kpm BOOL             是否启用KPM (true, false)"
+    echo "  --disable-oplus-zs BOOL  是否禁用OPLUS zsmalloc模块 (true, false)"
     echo "  --help                 显示此帮助信息"
     echo ""
     echo "示例: $0 --cpu sm8550 --feil oneplus_ace2pro_v --cpud kalama --android-version android13 --kernel-version 5.15 --build-method gki --susfs-ci true --lz4 false --vfs true"
@@ -63,6 +64,7 @@ SUSFS_CI="true"
 LZ4="false"
 VFS="true"
 KPM="true"
+DISABLE_OPLUS_ZS="false"
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -106,6 +108,10 @@ while [[ $# -gt 0 ]]; do
             KPM="$2"
             shift 2
             ;;
+        --disable-oplus-zs)
+            DISABLE_OPLUS_ZS="$2"
+            shift 2
+            ;;
         --help)
             show_help
             ;;
@@ -121,7 +127,7 @@ validate_param() {
     local param_name=$1
     local param_value=$2
     local valid_values=$3
-    
+
     if [[ ! $valid_values =~ (^|,)$param_value(,|$) ]]; then
         print_error "无效的 $param_name: $param_value"
         print_error "有效值: $valid_values"
@@ -138,6 +144,7 @@ validate_param "SUSFS_CI" "$SUSFS_CI" "true,false"
 validate_param "LZ4" "$LZ4" "true,false"
 validate_param "VFS" "$VFS" "true,false"
 validate_param "KPM" "$KPM" "true,false"
+validate_param "DISABLE_OPLUS_ZS" "$DISABLE_OPLUS_ZS" "true,false"
 # 显示选择的参数
 print_info "选择的参数:"
 echo "CPU: $CPU"
@@ -150,6 +157,7 @@ echo "SUSFS_CI: $SUSFS_CI"
 echo "LZ4: $LZ4"
 echo "VFS: $VFS"
 echo "KPM: $KPM"
+echo "DISABLE_OPLUS_ZS: $DISABLE_OPLUS_ZS"
 
 # 创建工作目录
 WORKSPACE=$(pwd)
@@ -177,7 +185,7 @@ else
     TEMP_DIR=$(mktemp -d)
     cd $TEMP_DIR
     repo init >/dev/null 2>&1 || true
-    
+
     if [ -f .repo/repo/repo ]; then
         NEW_REPO=$(readlink -f .repo/repo/repo)
         if [ -f "$NEW_REPO" ]; then
@@ -186,7 +194,7 @@ else
             print_success "repo更新完成"
         fi
     fi
-    
+
     # 清理临时目录
     cd - >/dev/null
     rm -rf $TEMP_DIR
@@ -266,7 +274,7 @@ if [ "$LZ4" = "true" ]; then
     cp -r ../../SukiSU_patch/other/lz4k/include/linux/* ./include/linux/
     cp -r ../../SukiSU_patch/other/lz4k/lib/* ./lib/
     cp -r ../../SukiSU_patch/other/lz4k/crypto/* ./crypto/
-    
+
     cp ../../SukiSU_patch/other/lz4k_patch/$KERNEL_VERSION/lz4kd.patch ./
     echo "正在打lz4kd补丁"
     patch -p1 -F 3 < lz4kd.patch || true
@@ -337,7 +345,7 @@ if [ "$LZ4" = "true" ]; then
             print_warning "警告：文件 $CONFIG_FILE 不包含字符串 CONFIG_ZSMALLOC。"
             echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
         fi
-            
+
         sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
     fi
 
@@ -354,24 +362,6 @@ if [ "$LZ4" = "true" ]; then
         rm "$WORKSPACE/kernel_workspace/kernel_platform/common/android/gki_aarch64_modules" || true
         touch "$WORKSPACE/kernel_workspace/kernel_platform/common/android/gki_aarch64_modules"
         print_info "5.15: 已修复zram&zsmalloc"
-        
-        # 禁用OPLUS特定的zsmalloc模块，避免符号重复导出
-        print_info "禁用OPLUS特定的zsmalloc模块以避免符号冲突..."
-        
-        # 方案1：创建空的源文件，编译时会跳过
-        if [ -d "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc" ]; then
-            echo "// 此模块已禁用，避免与内核内置zsmalloc符号冲突" > "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/oplus_bsp_zsmalloc.c"
-        fi
-        
-        # # 方案2：修改Makefile，不编译该模块（如果上面方法不起作用，可以尝试此方法）
-        # if [ -f "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/Makefile" ]; then
-        #     sed -i 's/obj-$(CONFIG_ZSMALLOC_THP).*/# 禁用oplus_bsp_zsmalloc以避免符号冲突/' "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/Makefile"
-        # fi
-        
-        # # 方案3：在源文件中注释掉导出符号的行
-        # if [ -f "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/oplus_bsp_zsmalloc.c" ]; then
-        #     sed -i 's/EXPORT_SYMBOL(zs_get_total_pages)/\/\/ EXPORT_SYMBOL(zs_get_total_pages) \/\/ 避免符号冲突/' "$WORKSPACE/kernel_workspace/kernel_platform/msm-kernel/mm/oplus_mm/thp_zsmalloc/oplus_bsp_zsmalloc.c"
-        # fi
     fi
 
     if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
@@ -382,6 +372,31 @@ if [ "$LZ4" = "true" ]; then
         # Remove check_defconfig
         sed -i 's/check_defconfig//' ./common/build.config.gki
     fi
+fi
+
+# 禁用 OPLUS zsmalloc 模块（如果需要）
+if [ "$DISABLE_OPLUS_ZS" = "true" ]; then
+    print_info "禁用 OPLUS zsmalloc 模块..."
+
+    # 查找并禁用 OPLUS zsmalloc 模块的 Kconfig
+    OPLUS_ZSMALLOC_KCONFIG=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "Kconfig" -exec grep -l "oplus_bsp_zsmalloc" {} \;)
+    if [ -n "$OPLUS_ZSMALLOC_KCONFIG" ]; then
+        for kconfig in $OPLUS_ZSMALLOC_KCONFIG; do
+            print_info "修改 Kconfig 文件: $kconfig"
+            sed -i 's/source ".*oplus_bsp_zsmalloc.*"/# source "mm\/oplus_mm\/thp_zsmalloc\/Kconfig" # 已禁用/g' "$kconfig"
+        done
+    fi
+
+    # 查找并禁用 OPLUS zsmalloc 模块的 Makefile
+    OPLUS_ZSMALLOC_MAKEFILE=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "Makefile" -exec grep -l "oplus_bsp_zsmalloc" {} \;)
+    if [ -n "$OPLUS_ZSMALLOC_MAKEFILE" ]; then
+        for makefile in $OPLUS_ZSMALLOC_MAKEFILE; do
+            print_info "修改 Makefile 文件: $makefile"
+            sed -i 's/obj-$(CONFIG_OPLUS_FEATURE_ZSMALLOC).*$/# obj-$(CONFIG_OPLUS_FEATURE_ZSMALLOC) += thp_zsmalloc\/ # 已禁用/g' "$makefile"
+        done
+    fi
+
+    print_info "OPLUS zsmalloc 模块已禁用"
 fi
 
 # 步骤11: 构建内核
@@ -462,11 +477,11 @@ fi
 if [ "$SUSFS_CI" = "true" ]; then
     print_info "从CI下载最新的SUSFS模块..."
     cd $WORKSPACE
-    
+
     # 获取GitHub个人访问令牌
     echo "请输入您的GitHub个人访问令牌（如果没有，请访问 https://github.com/settings/tokens 创建一个）:"
     read -s GITHUB_TOKEN
-    
+
     LATEST_RUN_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
         "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs?status=success" | \
         jq -r '.workflow_runs[] | select(.head_branch == "v1.5.2+") | .id' | head -n 1)
