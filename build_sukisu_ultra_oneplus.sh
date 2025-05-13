@@ -43,13 +43,12 @@ show_help() {
     echo "  --kernel-version VER   设置内核版本 (5.10, 5.15, 6.1, 6.6)"
     echo "  --build-method METHOD  设置编译方式 (gki, perf)"
     echo "  --susfs-ci BOOL        SUSFS模块下载是否调用CI (true, false)"
-    echo "  --lz4 BOOL             是否启用lz4 (true, false)"
+    echo "  --zram BOOL             是否启用额外的ZRAM算法 (true, false)"
     echo "  --vfs BOOL             是否启用VFS (true, false)"
     echo "  --kpm BOOL             是否启用KPM (true, false)"
-    echo "  --disable-oplus-zs BOOL  是否禁用OPLUS zsmalloc模块 (true, false)"
     echo "  --help                 显示此帮助信息"
     echo ""
-    echo "示例: $0 --cpu sm8550 --feil oneplus_ace2pro_v --cpud kalama --android-version android13 --kernel-version 5.15 --build-method gki --susfs-ci true --lz4 false --vfs true"
+    echo "示例: $0 --cpu sm8550 --feil oneplus_ace2pro_v --cpud kalama --android-version android13 --kernel-version 5.15 --build-method gki --susfs-ci true --zram false --vfs true"
     exit 0
 }
 
@@ -61,10 +60,9 @@ ANDROID_VERSION="android13"
 KERNEL_VERSION="5.15"
 BUILD_METHOD="gki"
 SUSFS_CI="true"
-LZ4="true"
+ZRAM="false"
 VFS="true"
 KPM="true"
-DISABLE_OPLUS_ZS="true"
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -96,8 +94,8 @@ while [[ $# -gt 0 ]]; do
             SUSFS_CI="$2"
             shift 2
             ;;
-        --lz4)
-            LZ4="$2"
+        --zram)
+            ZRAM="$2"
             shift 2
             ;;
         --vfs)
@@ -106,10 +104,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --kpm)
             KPM="$2"
-            shift 2
-            ;;
-        --disable-oplus-zs)
-            DISABLE_OPLUS_ZS="$2"
             shift 2
             ;;
         --help)
@@ -141,10 +135,9 @@ validate_param "ANDROID_VERSION" "$ANDROID_VERSION" "android12,android13,android
 validate_param "KERNEL_VERSION" "$KERNEL_VERSION" "5.10,5.15,6.1,6.6"
 validate_param "BUILD_METHOD" "$BUILD_METHOD" "gki,perf"
 validate_param "SUSFS_CI" "$SUSFS_CI" "true,false"
-validate_param "LZ4" "$LZ4" "true,false"
+validate_param "ZRAM" "$ZRAM" "true,false"
 validate_param "VFS" "$VFS" "true,false"
 validate_param "KPM" "$KPM" "true,false"
-validate_param "DISABLE_OPLUS_ZS" "$DISABLE_OPLUS_ZS" "true,false"
 # 显示选择的参数
 print_info "选择的参数:"
 echo "CPU: $CPU"
@@ -154,10 +147,9 @@ echo "ANDROID_VERSION: $ANDROID_VERSION"
 echo "KERNEL_VERSION: $KERNEL_VERSION"
 echo "BUILD_METHOD: $BUILD_METHOD"
 echo "SUSFS_CI: $SUSFS_CI"
-echo "LZ4: $LZ4"
+echo "ZRAM: $ZRAM"
 echo "VFS: $VFS"
 echo "KPM: $KPM"
-echo "DISABLE_OPLUS_ZS: $DISABLE_OPLUS_ZS"
 
 # 创建工作目录
 WORKSPACE=$(pwd)
@@ -207,8 +199,12 @@ repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/one
 repo sync
 
 print_info "修改BUILD.bazel文件..."
-sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' kernel_platform/common/BUILD.bazel
-sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' kernel_platform/msm-kernel/BUILD.bazel
+if [ -e kernel_platform/common/BUILD.bazel ]; then
+    sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' kernel_platform/common/BUILD.bazel
+fi
+if [ -e kernel_platform/msm-kernel/BUILD.bazel ]; then
+    sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' kernel_platform/msm-kernel/BUILD.bazel
+fi
 rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
 rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
 
@@ -242,16 +238,18 @@ cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERS
 cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
 cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
 
-if [ "$LZ4" = "true" ]; then
-    echo "正在给内核打lz4补丁"
-    cp -r ../SukiSU_patch/other/lz4k/include/linux/* ./common/include/linux
-    cp -r ../SukiSU_patch/other/lz4k/lib/* ./common/lib
-    cp -r ../SukiSU_patch/other/lz4k/crypto/* ./common/crypto
+if [ "$ZRAM" = "true" ]; then
+    echo "正在打zram补丁"
+    cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux
+    cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
+    cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto
+    cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./common/lib/
+    echo "zram_patch完成"
 fi
 
 cd ./common
 patch -p1 < 50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERSION.patch || true
-echo "完成"
+echo "susfs_patch完成"
 
 # 步骤8: 应用 Hide Stuff Patches
 print_info "应用 Hide Stuff Patches..."
@@ -259,9 +257,10 @@ cd $WORKSPACE/kernel_workspace/kernel_platform/common
 cp ../../SukiSU_patch/69_hide_stuff.patch ./
 echo "正在打隐藏应用补丁"
 patch -p1 -F 3 < 69_hide_stuff.patch
+echo "隐藏应用_patch完成"
 
-# 步骤9: 应用 VFS 和 LZ4KD
-print_info "应用 VFS 和 LZ4KD..."
+# 步骤9: 应用 VFS
+print_info "应用 VFS..."
 cd $WORKSPACE/kernel_workspace/kernel_platform/common
 if [ "$VFS" = "true" ]; then
     cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
@@ -270,18 +269,17 @@ if [ "$VFS" = "true" ]; then
     echo "vfs_patch完成"
 fi
 
-if [ "$LZ4" = "true" ]; then
-    cp -r ../../SukiSU_patch/other/lz4k/include/linux/* ./include/linux/
-    cp -r ../../SukiSU_patch/other/lz4k/lib/* ./lib/
-    cp -r ../../SukiSU_patch/other/lz4k/crypto/* ./crypto/
-
-    cp ../../SukiSU_patch/other/lz4k_patch/$KERNEL_VERSION/lz4kd.patch ./
+# 步骤10: 应用 LZ4KD
+print_info "应用 LZ4KD..."
+cd $WORKSPACE/kernel_workspace/kernel_platform/common
+if [ "$ZRAM" = "true" ]; then
+    cp ../../SukiSU_patch/other/zram/zram_patch/$KERNEL_VERSION/lz4kd.patch ./
     echo "正在打lz4kd补丁"
     patch -p1 -F 3 < lz4kd.patch || true
-    echo "lz4_patch完成"
+    echo "lz4kd_patch完成"
 fi
 
-# 步骤10: 添加配置设置
+# 步骤11: 添加配置设置
 print_info "添加配置设置..."
 cd $WORKSPACE/kernel_workspace/kernel_platform
 CONFIG_FILE=./common/arch/arm64/configs/gki_defconfig
@@ -323,12 +321,10 @@ if [ "$VFS" = "true" ]; then
 fi
 
 # Remove check_defconfig
-if [ "$LZ4" = "false" ]; then
-    sed -i 's/check_defconfig//' ./common/build.config.gki
-fi
+sed -i 's/check_defconfig//' ./common/build.config.gki
 
-# 添加 LZ4 Config
-if [ "$LZ4" = "true" ]; then
+# LZ4KD配置
+if [ "$ZRAM" = "true" ]; then
     if [ "$KERNEL_VERSION" = "5.10" ]; then
         echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
         echo "CONFIG_ZRAM=y" >> "$CONFIG_FILE"
@@ -345,7 +341,6 @@ if [ "$LZ4" = "true" ]; then
             print_warning "警告：文件 $CONFIG_FILE 不包含字符串 CONFIG_ZSMALLOC。"
             echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
         fi
-
         sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
     fi
 
@@ -355,12 +350,21 @@ if [ "$LZ4" = "true" ]; then
     fi
 
     if [ "$ANDROID_VERSION" = "android14" ] || [ "$ANDROID_VERSION" = "android15" ]; then
-        sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$WORKSPACE/kernel_workspace/kernel_platform/common/modules.bzl"
+        if [ -e "./common/modules.bzl" ]; then
+            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "./common/modules.bzl"
+        fi
+        
+        if [ -e "./msm-kernel/modules.bzl" ]; then
+            sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "./msm-kernel/modules.bzl"
+            echo "CONFIG_ZSMALLOC=y" >> "msm-kernel/arch/arm64/configs/$CPUD-GKI.config"
+            echo "CONFIG_ZRAM=y" >> "msm-kernel/arch/arm64/configs/$CPUD-GKI.config"
+        fi
+        
         echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
         print_info "Android14_Bazel: 已修复zram&zsmalloc"
-    elif [ "$KERNEL_VERSION" = "5.15" ]; then
-        rm "$WORKSPACE/kernel_workspace/kernel_platform/common/android/gki_aarch64_modules" || true
-        touch "$WORKSPACE/kernel_workspace/kernel_platform/common/android/gki_aarch64_modules"
+    elif [ "$KERNEL_VERSION" = "5.10" ] || [ "$KERNEL_VERSION" = "5.15" ]; then
+        rm -f "common/android/gki_aarch64_modules"
+        touch "common/android/gki_aarch64_modules"
         print_info "5.15: 已修复zram&zsmalloc"
     fi
 
@@ -369,129 +373,30 @@ if [ "$LZ4" = "true" ]; then
         echo "CONFIG_CRYPTO_LZ4K=y" >> "$CONFIG_FILE"
         echo "CONFIG_CRYPTO_LZ4KD=y" >> "$CONFIG_FILE"
         echo "CONFIG_CRYPTO_842=y" >> "$CONFIG_FILE"
-        # Remove check_defconfig
-        sed -i 's/check_defconfig//' ./common/build.config.gki
     fi
 fi
 
-# 禁用 OPLUS zsmalloc 模块（如果需要）
-if [ "$DISABLE_OPLUS_ZS" = "true" ]; then
-    print_info "禁用 OPLUS zsmalloc 模块..."
-
-    # 查找并禁用 OPLUS zsmalloc 模块的 Kconfig
-    OPLUS_ZSMALLOC_KCONFIG=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "Kconfig" -exec grep -l "oplus_bsp_zsmalloc\|OPLUS_FEATURE_ZSMALLOC" {} \;)
-    if [ -n "$OPLUS_ZSMALLOC_KCONFIG" ]; then
-        for kconfig in $OPLUS_ZSMALLOC_KCONFIG; do
-            print_info "修改 Kconfig 文件: $kconfig"
-            sed -i 's/source ".*oplus_bsp_zsmalloc.*"/# source "mm\/oplus_mm\/thp_zsmalloc\/Kconfig" # 已禁用/g' "$kconfig"
-            sed -i 's/source ".*OPLUS_FEATURE_ZSMALLOC.*"/# source "mm\/oplus_mm\/thp_zsmalloc\/Kconfig" # 已禁用/g' "$kconfig"
-        done
-    fi
-
-    # 查找并禁用 OPLUS zsmalloc 模块的 Makefile
-    OPLUS_ZSMALLOC_MAKEFILE=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "Makefile" -exec grep -l "oplus_bsp_zsmalloc\|OPLUS_FEATURE_ZSMALLOC" {} \;)
-    if [ -n "$OPLUS_ZSMALLOC_MAKEFILE" ]; then
-        for makefile in $OPLUS_ZSMALLOC_MAKEFILE; do
-            print_info "修改 Makefile 文件: $makefile"
-            sed -i 's/obj-$(CONFIG_OPLUS_FEATURE_ZSMALLOC).*$/# obj-$(CONFIG_OPLUS_FEATURE_ZSMALLOC) += thp_zsmalloc\/ # 已禁用/g' "$makefile"
-        done
-    fi
-
-    # 直接删除相关目录文件
-    OPLUS_ZSMALLOC_PATH="$WORKSPACE/kernel_workspace/kernel_platform/oplus/kernel/mm/thp_zsmalloc"
-    if [ -d "$OPLUS_ZSMALLOC_PATH" ]; then
-        print_info "尝试重命名 OPLUS zsmalloc 目录: $OPLUS_ZSMALLOC_PATH"
-        mv "$OPLUS_ZSMALLOC_PATH" "${OPLUS_ZSMALLOC_PATH}_disabled" || true
-    fi
-
-    # 寻找所有可能的OPLUS thp_zsmalloc路径
-    for POTENTIAL_PATH in $(find "$WORKSPACE/kernel_workspace/kernel_platform" -path "*/mm/oplus_mm/thp_zsmalloc" -type d); do
-        if [ -d "$POTENTIAL_PATH" ]; then
-            print_info "找到OPLUS zsmalloc路径: $POTENTIAL_PATH"
-            # 备份原始文件
-            cp -r "$POTENTIAL_PATH" "${POTENTIAL_PATH}_backup"
-            # 清空目录内容，保留目录结构
-            find "$POTENTIAL_PATH" -type f -name "*.c" -o -name "*.h" | while read file; do
-                echo "// 此文件已被禁用，以避免符号冲突" > "$file"
-            done
-            # 创建空的oplus_bsp_zsmalloc.c文件
-            echo "// 此文件已被禁用，以避免符号冲突" > "$POTENTIAL_PATH/oplus_bsp_zsmalloc.c"
-            print_info "已清空 $POTENTIAL_PATH 中的源文件"
-        fi
-    done
-
-    # 修改 CONFIG 文件，禁用相关配置
-    if [ -f "$CONFIG_FILE" ]; then
-        print_info "修改内核配置文件，禁用OPLUS_FEATURE_ZSMALLOC"
-        echo "# CONFIG_OPLUS_FEATURE_ZSMALLOC is not set" >> "$CONFIG_FILE"
-    fi
-
-    print_info "OPLUS zsmalloc 模块已禁用"
-fi
-
-# 步骤11: 构建内核
+# 步骤12: 构建内核
 print_info "构建内核..."
 cd $WORKSPACE/kernel_workspace
-
-# 紧急修复：检查并禁用导致zs_get_total_pages冲突的模块
-print_info "执行预构建检查，防止符号冲突..."
-CONFLICT_MODULES=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -type d -path "*/mm/*zsmalloc*")
-if [ -n "$CONFLICT_MODULES" ]; then
-    print_info "发现可能冲突的zsmalloc模块:"
-    for module in $CONFLICT_MODULES; do
-        echo "  - $module"
-        
-        # 对每个可能冲突的模块进行处理
-        if [[ "$module" == *"oplus"* || "$module" == *"thp_zsmalloc"* ]]; then
-            print_info "处理OPLUS自定义zsmalloc模块: $module"
-            
-            # 创建一个简单的替代模块
-            if [ -d "$module" ]; then
-                # 备份模块目录
-                MODULE_BACKUP="${module}_original_backup"
-                if [ ! -d "$MODULE_BACKUP" ]; then
-                    cp -r "$module" "$MODULE_BACKUP"
-                fi
-                
-                # 创建空实现
-                rm -rf "$module"/*
-                mkdir -p "$module"
-                cat > "$module/dummy.c" << EOF
-// 空实现，防止zs_get_total_pages符号冲突
-#include <linux/module.h>
-#include <linux/kernel.h>
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Dummy module to prevent symbol conflicts");
-EOF
-            fi
-        fi
-    done
-fi
-
-# 紧急修复：检查内核配置中是否存在冲突配置
-KERNEL_CONFIG_FILES=$(find "$WORKSPACE/kernel_workspace/kernel_platform" -name "*config*" -type f)
-for config in $KERNEL_CONFIG_FILES; do
-    if grep -q "CONFIG_OPLUS_FEATURE_ZSMALLOC" "$config"; then
-        print_info "在配置文件中禁用OPLUS_FEATURE_ZSMALLOC: $config"
-        sed -i 's/CONFIG_OPLUS_FEATURE_ZSMALLOC=.*/# CONFIG_OPLUS_FEATURE_ZSMALLOC is not set/' "$config"
-    fi
-done
 
 if [ "$CPU" = "sm8650" ] || [ "$CPU" = "sm7675" ]; then
     ./kernel_platform/build_with_bazel.py -t $CPUD $BUILD_METHOD
 else
-    LTO=full ./kernel_platform/oplus/build/oplus_build_kernel.sh $CPUD $BUILD_METHOD
+    LTO=thin SYSTEM_DLKM_RE_SIGN=0 BUILD_SYSTEM_DLKM=0 KMI_SYMBOL_LIST_STRICT_MODE=0 ./kernel_platform/oplus/build/oplus_build_kernel.sh $CPUD $BUILD_METHOD
 fi
 
-# 步骤12: 制作 AnyKernel3
+# 步骤13: 制作 AnyKernel3
 print_info "制作 AnyKernel3..."
 cd $WORKSPACE
 git clone https://github.com/Numbersf/AnyKernel3 --depth=1
 rm -rf ./AnyKernel3/.git
 
 dir1="./kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/dist/"
-dir2="./kernel_workspace/kernel_platform/common/out/arch/arm64/boot/"
+dir2="./kernel_workspace/kernel_platform/bazel-out/k8-fastbuild/bin/msm-kernel/$CPUD"_gki_kbuild_mixed_tree/
 dir3="./kernel_workspace/kernel_platform/out/msm-$CPUD-$CPUD-$BUILD_METHOD/dist/"
+dir4="./kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/gki_kernel/common/arch/arm64/boot/"
+dir5="./kernel_workspace/kernel_platform/out/msm-$CPUD-$CPUD-$BUILD_METHOD/gki_kernel/common/arch/arm64/boot/"
 target1="./AnyKernel3/"
 target2="./kernel_workspace/kernel"
 
@@ -502,6 +407,10 @@ elif find "$dir2" -name "Image" | grep -q "Image"; then
     image_path="$dir2"Image
 elif find "$dir3" -name "Image" | grep -q "Image"; then
     image_path="$dir3"Image
+elif find "$dir4" -name "Image" | grep -q "Image"; then
+    image_path="$dir4"Image
+elif find "$dir5" -name "Image" | grep -q "Image"; then
+    image_path="$dir5"Image
 else
     image_path=$(find "./kernel_workspace/kernel_platform/common/out/" -name "Image" | head -n 1)
 fi
@@ -521,7 +430,7 @@ else
 fi
 
 # 可选复制其它新文件（如果存在）
-if [ "$CPUD" = "sm8750" ]; then
+if [ "$CPU" = "sm8750" ]; then
     for file in dtbo.img system_dlkm.erofs.img vendor_dlkm.img vendor_boot.img; do
         if [ -f "$dir1$file" ]; then
             target_name="$file"
@@ -536,8 +445,8 @@ if [ "$CPUD" = "sm8750" ]; then
     done
 fi
 
+# 步骤14: 应用 patch_linux 并替换 Image
 if [ "$KPM" = "true" ]; then
-    # 步骤13: 应用 patch_linux 并替换 Image
     print_info "应用 patch_linux 并替换 Image..."
     cd $WORKSPACE/kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/dist
     curl -LO https://raw.githubusercontent.com/Numbersf/Action-Build/main/patch_linux
@@ -548,19 +457,21 @@ if [ "$KPM" = "true" ]; then
     cp Image $WORKSPACE/AnyKernel3/Image
 fi
 
-# 步骤14: 下载 SUSFS 模块
+# 步骤15: 下载 SUSFS 模块
+print_info "下载SUSFS模块..."
+cd $WORKSPACE
+
 if [ "$SUSFS_CI" = "true" ]; then
     print_info "从CI下载最新的SUSFS模块..."
-    cd $WORKSPACE
-
+    
     # 获取GitHub个人访问令牌
     echo "请输入您的GitHub个人访问令牌（如果没有，请访问 https://github.com/settings/tokens 创建一个）:"
     read -s GITHUB_TOKEN
-
+    
     LATEST_RUN_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
         "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs?status=success" | \
         jq -r '.workflow_runs[] | select(.head_branch == "v1.5.2+") | .id' | head -n 1)
-
+    
     if [ -z "$LATEST_RUN_ID" ]; then
         print_error "未找到分支v1.5.2+的成功运行"
         print_info "尝试从Release下载SUSFS模块..."
@@ -569,36 +480,37 @@ if [ "$SUSFS_CI" = "true" ]; then
     else
         ARTIFACT_URL=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
             "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs/$LATEST_RUN_ID/artifacts" | jq -r '.artifacts[0].archive_download_url')
-
+        
         curl -L -H "Authorization: Bearer $GITHUB_TOKEN" -o ksu_module_susfs.zip "$ARTIFACT_URL"
         cp ksu_module_susfs.zip ./AnyKernel3/
     fi
 else
     print_info "从Release下载最新的SUSFS模块..."
-    cd $WORKSPACE
     wget https://github.com/sidex15/ksu_module_susfs/releases/latest/download/ksu_module_susfs_1.5.2+.zip
     cp ksu_module_susfs_1.5.2+.zip ./AnyKernel3/
 fi
 
-# 步骤15: 设置后缀并创建最终ZIP
+# 步骤16: 设置后缀并创建最终ZIP
 print_info "设置后缀并创建最终ZIP..."
 cd $WORKSPACE
 
 # 设置后缀
 SUFFIX=""
-if [ "$VFS" = "true" ]; then
-    SUFFIX="${SUFFIX}_VFS"
-fi
-if [ "$LZ4" = "true" ]; then
-    SUFFIX="${SUFFIX}_LZ4KD"
-fi
 if [ "$KPM" = "true" ]; then
     SUFFIX="${SUFFIX}_KPM"
 fi
+if [ "$VFS" = "true" ]; then
+    SUFFIX="${SUFFIX}_VFS"
+fi
+if [ "$ZRAM" = "true" ]; then
+    SUFFIX="${SUFFIX}_LZ4KD"
+fi
+
 # 清理FEIL名称
 FEIL_CLEAN="${FEIL}"
 FEIL_CLEAN="${FEIL_CLEAN%_v}"  # 去掉结尾的 _v（如果有）
 FEIL_CLEAN="${FEIL_CLEAN%_u}"  # 去掉结尾的 _u（如果有）
+FEIL_CLEAN="${FEIL_CLEAN%_t}"  # 去掉结尾的 _t（如果有）
 
 # 创建最终ZIP
 cd $WORKSPACE/AnyKernel3
