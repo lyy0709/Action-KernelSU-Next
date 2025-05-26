@@ -156,11 +156,6 @@ echo "Selected ZRAM: $ZRAM"
 WORKSPACE=$(pwd)
 print_info "工作目录: $WORKSPACE"
 
-# 步骤1: 配置Git（对应Configure Git步骤）
-print_info "配置Git..."
-git config --global user.name "Numbersf"
-git config --global user.email "263623064@qq.com"
-
 # 步骤2: 安装依赖（对应Install dependencies步骤）
 print_info "安装依赖..."
 sudo apt update && sudo apt upgrade -y
@@ -195,7 +190,7 @@ fi
 
 # 步骤4: 初始化repo并同步
 print_info "初始化repo并同步..."
-mkdir kernel_workspace && cd kernel_workspace
+rm -rf kernel_workspace && mkdir -p kernel_workspace && cd kernel_workspace
 repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/$CPU -m $FEIL.xml --depth=1
 repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
 if [ -e kernel_platform/common/BUILD.bazel ]; then
@@ -209,7 +204,7 @@ rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No pr
 
 # 步骤5: 删除 -dirty 后缀（对应Force remove -dirty suffix步骤）
 print_info "删除 -dirty 后缀..."
-cd kernel_workspace/kernel_platform
+cd kernel_platform
 sed -i 's/ -dirty//g' common/scripts/setlocalversion
 sed -i 's/ -dirty//g' msm-kernel/scripts/setlocalversion
 sed -i 's/ -dirty//g' external/dtc/scripts/setlocalversion
