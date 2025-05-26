@@ -62,7 +62,7 @@ BUILD_METHOD="gki"
 SUFFIX=""
 SUSFS_CI="true"
 VFS="true"
-ZRAM="true"
+ZRAM="false"
 
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
@@ -156,41 +156,20 @@ echo "Selected ZRAM: $ZRAM"
 WORKSPACE=$(pwd)
 print_info "工作目录: $WORKSPACE"
 
-# 步骤2: 安装依赖（对应Install dependencies步骤）
+# 步骤1: 安装依赖（对应Install dependencies步骤）
 print_info "安装依赖..."
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3 git curl
 
 # 步骤3: 安装repo工具（对应Install repo tool步骤）
 print_info "安装repo工具..."
-if ! command -v repo &> /dev/null; then
-    curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
-    chmod a+x ~/repo
-    sudo mv ~/repo /usr/local/bin/repo
-else
-    print_info "repo工具已安装，检查更新..."
-    # 创建临时目录并初始化repo以检查版本
-    TEMP_DIR=$(mktemp -d)
-    cd $TEMP_DIR
-    repo init >/dev/null 2>&1 || true
+curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
+chmod a+x ~/repo
+sudo mv ~/repo /usr/local/bin/repo
 
-    if [ -f .repo/repo/repo ]; then
-        NEW_REPO=$(readlink -f .repo/repo/repo)
-        if [ -f "$NEW_REPO" ]; then
-            print_info "发现新版本，正在更新repo..."
-            sudo cp "$NEW_REPO" /usr/local/bin/repo
-            print_success "repo更新完成"
-        fi
-    fi
-
-    # 清理临时目录
-    cd - >/dev/null
-    rm -rf $TEMP_DIR
-fi
-
-# 步骤4: 初始化repo并同步
+# 步骤4: 初始化repo并同步（对应Initialize repo and sync步骤）
 print_info "初始化repo并同步..."
-rm -rf kernel_workspace && mkdir -p kernel_workspace && cd kernel_workspace
+mkdir kernel_workspace && cd kernel_workspace
 repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/$CPU -m $FEIL.xml --depth=1
 repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
 if [ -e kernel_platform/common/BUILD.bazel ]; then
