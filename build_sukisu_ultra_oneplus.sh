@@ -37,32 +37,33 @@ show_help() {
     echo ""
     echo "选项:"
     echo "  --cpu CPU              设置CPU分支 (sm7550, sm7675, sm8450, sm8475, sm8550, sm8650, sm8750)"
-    echo "  --feil FEIL            设置配置文件 (oneplus_ace2pro_v, oneplus_11_v, oneplus12_v, 等)"
+    echo "  --feil FEIL            设置配置文件 (oneplus_nord_ce4_v, oneplus_ace_3v_v, oneplus_nord_4_v, oneplus_10_pro_v, oneplus_10t_v, oneplus_11r_v, oneplus_ace2_v, oneplus_ace_pro_v, oneplus_11_v, oneplus_12r_v, oneplus_ace2pro_v, oneplus_ace3_v, oneplus_open_v, oneplus12_v, oneplus_13r, oneplus_ace3_pro_v, oneplus_ace5, oneplus_pad2_v, oneplus_13, oneplus_ace5_pro, oneplus_13t)"
     echo "  --cpud CPUD            设置处理器代号 (crow, waipio, kalama, pineapple, sun)"
     echo "  --android-version VER  设置内核安卓版本 (android12, android13, android14, android15)"
     echo "  --kernel-version VER   设置内核版本 (5.10, 5.15, 6.1, 6.6)"
     echo "  --build-method METHOD  设置编译方式 (gki, perf)"
-    echo "  --susfs-ci BOOL        SUSFS模块下载是否调用CI (true, false)"
-    echo "  --zram BOOL             是否启用额外的ZRAM算法 (true, false)"
-    echo "  --vfs BOOL             是否启用VFS (true, false)"
-    echo "  --kpm BOOL             是否启用KPM (true, false)"
+    echo "  --suffix SUFFIX        自定义内核后缀 (留空则使用随机字符串)"
+    echo "  --susfs-ci BOOL        SUSFS模块下载是否使用CI构建 (true, false)"
+    echo "  --vfs BOOL             是否启用手动钩子(VFS) (true, false)"
+    echo "  --zram BOOL            是否启用添加更多的ZRAM算法 (true, false)"
     echo "  --help                 显示此帮助信息"
     echo ""
-    echo "示例: $0 --cpu sm8550 --feil oneplus_ace2pro_v --cpud kalama --android-version android13 --kernel-version 5.15 --build-method gki --susfs-ci true --zram false --vfs true"
+    echo "示例: $0 --cpu sm8550 --feil oneplus_ace2pro_v --cpud kalama --android-version android13 --kernel-version 5.15 --build-method gki --suffix '' --susfs-ci true --vfs true --zram false"
     exit 0
 }
 
-# 默认参数值
+# 默认参数值（与GitHub Actions一致）
 CPU="sm8550"
 FEIL="oneplus_11_v"
 CPUD="kalama"
 ANDROID_VERSION="android13"
 KERNEL_VERSION="5.15"
 BUILD_METHOD="gki"
+SUFFIX=""
 SUSFS_CI="true"
-ZRAM="false"
 VFS="true"
-KPM="true"
+ZRAM="true"
+
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -90,20 +91,20 @@ while [[ $# -gt 0 ]]; do
             BUILD_METHOD="$2"
             shift 2
             ;;
-        --susfs-ci)
-            SUSFS_CI="$2"
+        --suffix)
+            SUFFIX="$2"
             shift 2
             ;;
-        --zram)
-            ZRAM="$2"
+        --susfs-ci)
+            SUSFS_CI="$2"
             shift 2
             ;;
         --vfs)
             VFS="$2"
             shift 2
             ;;
-        --kpm)
-            KPM="$2"
+        --zram)
+            ZRAM="$2"
             shift 2
             ;;
         --help)
@@ -135,37 +136,37 @@ validate_param "ANDROID_VERSION" "$ANDROID_VERSION" "android12,android13,android
 validate_param "KERNEL_VERSION" "$KERNEL_VERSION" "5.10,5.15,6.1,6.6"
 validate_param "BUILD_METHOD" "$BUILD_METHOD" "gki,perf"
 validate_param "SUSFS_CI" "$SUSFS_CI" "true,false"
-validate_param "ZRAM" "$ZRAM" "true,false"
 validate_param "VFS" "$VFS" "true,false"
-validate_param "KPM" "$KPM" "true,false"
-# 显示选择的参数
-print_info "选择的参数:"
-echo "CPU: $CPU"
-echo "FEIL: $FEIL"
-echo "CPUD: $CPUD"
-echo "ANDROID_VERSION: $ANDROID_VERSION"
-echo "KERNEL_VERSION: $KERNEL_VERSION"
-echo "BUILD_METHOD: $BUILD_METHOD"
-echo "SUSFS_CI: $SUSFS_CI"
-echo "ZRAM: $ZRAM"
-echo "VFS: $VFS"
-echo "KPM: $KPM"
+validate_param "ZRAM" "$ZRAM" "true,false"
+
+# 显示选择的参数（对应GitHub Actions的Show selected inputs debug步骤）
+print_info "显示选择的输入参数调试信息:"
+echo "Selected CPU: $CPU"
+echo "Selected FEIL: $FEIL"
+echo "Selected CPUD: $CPUD"
+echo "Selected ANDROID_VERSION: $ANDROID_VERSION"
+echo "Selected KERNEL_VERSION: $KERNEL_VERSION"
+echo "Selected BUILD_METHOD: $BUILD_METHOD"
+echo "Custom SUFFIX: $SUFFIX"
+echo "Selected SUSFS_CI: $SUSFS_CI"
+echo "Selected VFS: $VFS"
+echo "Selected ZRAM: $ZRAM"
 
 # 创建工作目录
 WORKSPACE=$(pwd)
 print_info "工作目录: $WORKSPACE"
 
-# 步骤1: 安装依赖
+# 步骤1: 配置Git（对应Configure Git步骤）
+print_info "配置Git..."
+git config --global user.name "Numbersf"
+git config --global user.email "263623064@qq.com"
+
+# 步骤2: 安装依赖（对应Install dependencies步骤）
 print_info "安装依赖..."
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3 git curl wget jq unzip zip build-essential bc bison flex libssl-dev libelf-dev
+sudo apt install -y python3 git curl
 
-# 步骤2: 配置Git
-print_info "配置Git..."
-git config --global user.name "lyy0709"
-git config --global user.email "2722707908@qq.com"
-
-# 步骤3: 安装repo工具
+# 步骤3: 安装repo工具（对应Install repo tool步骤）
 print_info "安装repo工具..."
 if ! command -v repo &> /dev/null; then
     curl https://storage.googleapis.com/git-repo-downloads/repo > ~/repo
@@ -194,11 +195,9 @@ fi
 
 # 步骤4: 初始化repo并同步
 print_info "初始化repo并同步..."
-rm -rf kernel_workspace && mkdir -p kernel_workspace && cd kernel_workspace
+mkdir kernel_workspace && cd kernel_workspace
 repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/$CPU -m $FEIL.xml --depth=1
-repo sync
-
-print_info "修改BUILD.bazel文件..."
+repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
 if [ -e kernel_platform/common/BUILD.bazel ]; then
     sed -i '/^[[:space:]]*"protected_exports_list"[[:space:]]*:[[:space:]]*"android\/abi_gki_protected_exports_aarch64",$/d' kernel_platform/common/BUILD.bazel
 fi
@@ -208,9 +207,9 @@ fi
 rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
 rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
 
-# 步骤5: 删除 -dirty 后缀
+# 步骤5: 删除 -dirty 后缀（对应Force remove -dirty suffix步骤）
 print_info "删除 -dirty 后缀..."
-cd kernel_platform
+cd kernel_workspace/kernel_platform
 sed -i 's/ -dirty//g' common/scripts/setlocalversion
 sed -i 's/ -dirty//g' msm-kernel/scripts/setlocalversion
 sed -i 's/ -dirty//g' external/dtc/scripts/setlocalversion
@@ -218,22 +217,63 @@ sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' common/scripts/setlocal
 git add -A
 git commit -m "Force remove -dirty suffix from kernel version"
 
-# 步骤6: 添加 SukiSU Ultra
+# 步骤6: 修改setlocalversion后缀（如果SUFFIX已设置）（对应Modify setlocalversion suffix if SUFFIX is set步骤）
+if [ "$SUFFIX" != "" ]; then
+    print_info "修改setlocalversion后缀..."
+    cd $WORKSPACE/kernel_workspace
+    for path in \
+        kernel_platform/common/scripts/setlocalversion \
+        kernel_platform/msm-kernel/scripts/setlocalversion \
+        kernel_platform/external/dtc/scripts/setlocalversion; do
+        sed -i '/^res=/a res=$(echo "$res" | sed -E '\''s/-[0-9]+-o-g[0-9a-f]{7,}//'\'')' "$path"
+        sed -i "\$s|echo \"\\\$res\"|echo \"\$res-$SUFFIX\"|" "$path"
+    done
+    git add -A
+    git commit -m "Clean git describe suffix and append custom suffix: $SUFFIX"
+fi
+
+# 步骤7: 生成随机内核后缀（如果SUFFIX为空）（对应Generate random kernel suffix if SUFFIX is empty步骤）
+if [ "$SUFFIX" = "" ]; then
+    print_info "生成随机内核后缀..."
+    cd $WORKSPACE/kernel_workspace
+
+    RANDOM_DIGIT=$(od -An -N1 -tu1 < /dev/urandom | tr -d '[:space:]' | awk '{print $1 % 11}')
+    RANDOM_HASH=$(od -An -N7 -tx1 /dev/urandom | tr -d ' \n')
+    RANDOM_SUFFIX="${RANDOM_DIGIT}-o-g${RANDOM_HASH}"
+
+    for path in \
+        kernel_platform/common/scripts/setlocalversion \
+        kernel_platform/msm-kernel/scripts/setlocalversion \
+        kernel_platform/external/dtc/scripts/setlocalversion; do
+
+        # 清理默认后缀
+        sed -i '/^res=/a res=$(echo "$res" | sed -E '\''s/-[0-9]+-o-g[0-9a-fA-F]{7,}//g'\'')' "$path"
+
+        # 替换 echo "$res" 为带随机后缀
+        sed -i "\$s|echo \"\\\$res\"|echo \"\$res-$RANDOM_SUFFIX\"|" "$path"
+    done
+
+    git add -A
+    git commit -m "Fix: inject random suffix"
+fi
+
+# 步骤8: 添加 KernelSU-SukiSU Ultra（对应Add KernelSU-SukiSU Ultra步骤）
 print_info "添加 KernelSU-SukiSU Ultra..."
-curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
+cd $WORKSPACE/kernel_workspace/kernel_platform
+curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
 cd ./KernelSU
-KSU_VERSION=$(expr $(git rev-list --count main) "+" 10606)
+KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 10606)
+export KSUVER=$KSU_VERSION
 export KSU_VERSION=$KSU_VERSION
 sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
-cd ..
 
-# 步骤7: 应用 Patches SukiSU Ultra
+# 步骤9: 应用 Patches SukiSU Ultra（对应Apply Patches SukiSU Ultra步骤）
 print_info "应用 Patches SukiSU Ultra..."
 cd $WORKSPACE/kernel_workspace
 git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-$ANDROID_VERSION-$KERNEL_VERSION
 git clone https://github.com/ShirkNeko/SukiSU_patch.git
 cd kernel_platform
-echo "正在给内核打susfs补丁"
+echo "正在打susfs补丁"
 cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERSION.patch ./common/
 cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
 cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
@@ -248,10 +288,14 @@ if [ "$ZRAM" = "true" ]; then
 fi
 
 cd ./common
+if [[ "$FEIL" == "oneplus_13" || "$FEIL" == "oneplus_ace5_pro" ]]; then
+    sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERSION.patch
+    sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERSION.patch
+fi
 patch -p1 < 50_add_susfs_in_gki-$ANDROID_VERSION-$KERNEL_VERSION.patch || true
 echo "susfs_patch完成"
 
-# 步骤8: 应用 Hide Stuff Patches
+# 步骤10: 应用 Hide Stuff Patches（对应Apply Hide Stuff Patches步骤）
 print_info "应用 Hide Stuff Patches..."
 cd $WORKSPACE/kernel_workspace/kernel_platform/common
 cp ../../SukiSU_patch/69_hide_stuff.patch ./
@@ -259,7 +303,18 @@ echo "正在打隐藏应用补丁"
 patch -p1 -F 3 < 69_hide_stuff.patch
 echo "隐藏应用_patch完成"
 
-# 步骤9: 应用 VFS
+# 步骤11: 转换 HMBIRD_OGKI 到 HMBIRD_GKI（对应Convert HMBIRD_OGKI to HMBIRD_GKI步骤）
+if [ "$KERNEL_VERSION" = "6.6" ]; then
+    print_info "转换 HMBIRD_OGKI 到 HMBIRD_GKI..."
+    cd $WORKSPACE/kernel_workspace/kernel_platform/common
+    sed -i '1iobj-y += hmbird_patch.o' drivers/Makefile
+    wget https://github.com/Numbersf/Action-Build/raw/main/patchs/hmbird_patch.patch
+    echo "正在打OGKI转换GKI补丁"
+    patch -p1 -F 3 < hmbird_patch.patch
+    echo "OGKI转换GKI patch完成"
+fi
+
+# 步骤12: 应用 VFS（对应Apply VFS步骤）
 print_info "应用 VFS..."
 cd $WORKSPACE/kernel_workspace/kernel_platform/common
 if [ "$VFS" = "true" ]; then
@@ -269,17 +324,21 @@ if [ "$VFS" = "true" ]; then
     echo "vfs_patch完成"
 fi
 
-# 步骤10: 应用 LZ4KD
+# 步骤13: 应用 LZ4KD（对应Apply LZ4KD步骤）
 print_info "应用 LZ4KD..."
 cd $WORKSPACE/kernel_workspace/kernel_platform/common
 if [ "$ZRAM" = "true" ]; then
     cp ../../SukiSU_patch/other/zram/zram_patch/$KERNEL_VERSION/lz4kd.patch ./
     echo "正在打lz4kd补丁"
     patch -p1 -F 3 < lz4kd.patch || true
-    echo "lz4kd_patch完成"
+    echo 'lz4kd_patch完成'
+    cp ../../SukiSU_patch/other/zram/zram_patch/$KERNEL_VERSION/lz4k_oplus.patch ./
+    echo "正在打lz4k_oplus补丁"
+    patch -p1 -F 3 < lz4k_oplus.patch || true
+    echo 'lz4k_oplus_patch完成'
 fi
 
-# 步骤11: 添加配置设置
+# 步骤14: 添加配置设置（对应Add Configuration Settings步骤）
 print_info "添加配置设置..."
 cd $WORKSPACE/kernel_workspace/kernel_platform
 CONFIG_FILE=./common/arch/arm64/configs/gki_defconfig
@@ -290,7 +349,6 @@ echo "CONFIG_KPM=y" >> "$CONFIG_FILE"
 if [ "$VFS" = "false" ]; then
     echo "CONFIG_KPROBES=y" >> "$CONFIG_FILE"
 fi
-
 # VFS config
 if [ "$VFS" = "true" ]; then
     echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> "$CONFIG_FILE"
@@ -325,6 +383,8 @@ sed -i 's/check_defconfig//' ./common/build.config.gki
 
 # LZ4KD配置
 if [ "$ZRAM" = "true" ]; then
+    CONFIG_FILE=./common/arch/arm64/configs/gki_defconfig
+
     if [ "$KERNEL_VERSION" = "5.10" ]; then
         echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
         echo "CONFIG_ZRAM=y" >> "$CONFIG_FILE"
@@ -335,10 +395,8 @@ if [ "$ZRAM" = "true" ]; then
 
     if [ "$KERNEL_VERSION" != "6.6" ] && [ "$KERNEL_VERSION" != "5.10" ]; then
         if grep -q "CONFIG_ZSMALLOC" -- "$CONFIG_FILE"; then
-            print_info "提示：文件 $CONFIG_FILE 包含字符串 CONFIG_ZSMALLOC。"
             sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' "$CONFIG_FILE"
         else
-            print_warning "警告：文件 $CONFIG_FILE 不包含字符串 CONFIG_ZSMALLOC。"
             echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
         fi
         sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
@@ -350,22 +408,20 @@ if [ "$ZRAM" = "true" ]; then
     fi
 
     if [ "$ANDROID_VERSION" = "android14" ] || [ "$ANDROID_VERSION" = "android15" ]; then
-        if [ -e "./common/modules.bzl" ]; then
+        if [ -e ./common/modules.bzl ]; then
             sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "./common/modules.bzl"
         fi
-        
-        if [ -e "./msm-kernel/modules.bzl" ]; then
+
+        if [ -e ./msm-kernel/modules.bzl ]; then
             sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "./msm-kernel/modules.bzl"
             echo "CONFIG_ZSMALLOC=y" >> "msm-kernel/arch/arm64/configs/$CPUD-GKI.config"
             echo "CONFIG_ZRAM=y" >> "msm-kernel/arch/arm64/configs/$CPUD-GKI.config"
         fi
         
         echo "CONFIG_MODULE_SIG_FORCE=n" >> "$CONFIG_FILE"
-        print_info "Android14_Bazel: 已修复zram&zsmalloc"
     elif [ "$KERNEL_VERSION" = "5.10" ] || [ "$KERNEL_VERSION" = "5.15" ]; then
-        rm -f "common/android/gki_aarch64_modules"
+        rm "common/android/gki_aarch64_modules"
         touch "common/android/gki_aarch64_modules"
-        print_info "5.15: 已修复zram&zsmalloc"
     fi
 
     if grep -q "CONFIG_ZSMALLOC=y" "$CONFIG_FILE" && grep -q "CONFIG_ZRAM=y" "$CONFIG_FILE"; then
@@ -373,30 +429,32 @@ if [ "$ZRAM" = "true" ]; then
         echo "CONFIG_CRYPTO_LZ4K=y" >> "$CONFIG_FILE"
         echo "CONFIG_CRYPTO_LZ4KD=y" >> "$CONFIG_FILE"
         echo "CONFIG_CRYPTO_842=y" >> "$CONFIG_FILE"
+        echo "CONFIG_CRYPTO_LZ4K_OPLUS=y" >> "$CONFIG_FILE"
+        echo "CONFIG_ZRAM_WRITEBACK=y" >> "$CONFIG_FILE"
     fi
 fi
 
-# 步骤12: 构建内核
+# 步骤15: 构建内核（对应Build kernel和Fallback build kernel步骤）
 print_info "构建内核..."
 cd $WORKSPACE/kernel_workspace
 
 if [ "$CPU" = "sm8650" ] || [ "$CPU" = "sm7675" ]; then
     ./kernel_platform/build_with_bazel.py -t $CPUD $BUILD_METHOD
 else
-    LTO=thin SYSTEM_DLKM_RE_SIGN=0 BUILD_SYSTEM_DLKM=0 KMI_SYMBOL_LIST_STRICT_MODE=0 ./kernel_platform/oplus/build/oplus_build_kernel.sh $CPUD $BUILD_METHOD
+    LTO=full SYSTEM_DLKM_RE_SIGN=0 BUILD_SYSTEM_DLKM=0 KMI_SYMBOL_LIST_STRICT_MODE=0 ./kernel_platform/oplus/build/oplus_build_kernel.sh $CPUD $BUILD_METHOD
 fi
 
-# 步骤13: 制作 AnyKernel3
+# 步骤16: 制作 AnyKernel3（对应Make AnyKernel3步骤）
 print_info "制作 AnyKernel3..."
 cd $WORKSPACE
 git clone https://github.com/Numbersf/AnyKernel3 --depth=1
 rm -rf ./AnyKernel3/.git
 
-dir1="./kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/dist/"
-dir2="./kernel_workspace/kernel_platform/bazel-out/k8-fastbuild/bin/msm-kernel/$CPUD"_gki_kbuild_mixed_tree/
-dir3="./kernel_workspace/kernel_platform/out/msm-$CPUD-$CPUD-$BUILD_METHOD/dist/"
-dir4="./kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/gki_kernel/common/arch/arm64/boot/"
-dir5="./kernel_workspace/kernel_platform/out/msm-$CPUD-$CPUD-$BUILD_METHOD/gki_kernel/common/arch/arm64/boot/"
+dir1="kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/dist/"
+dir2="kernel_workspace/kernel_platform/bazel-out/k8-fastbuild/bin/msm-kernel/$CPUD"_gki_kbuild_mixed_tree/
+dir3="kernel_workspace/kernel_platform/out/msm-$CPUD-$CPUD-$BUILD_METHOD/dist/"
+dir4="kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/gki_kernel/common/arch/arm64/boot/"
+dir5="kernel_workspace/kernel_platform/out/msm-$CPUD-$CPUD-$BUILD_METHOD/gki_kernel/common/arch/arm64/boot/"
 target1="./AnyKernel3/"
 target2="./kernel_workspace/kernel"
 
@@ -425,7 +483,7 @@ if [ -n "$image_path" ] && [ -f "$image_path" ]; then
     fi
     cp "$dir1"Image ./AnyKernel3/Image
 else
-    print_error "未找到 Image 文件，构建可能失败"
+    echo "未找到 Image 文件，构建可能失败"
     exit 1
 fi
 
@@ -440,81 +498,117 @@ if [ "$CPU" = "sm8750" ]; then
             fi
             cp "$dir1$file" "./AnyKernel3/$target_name"
         else
-            print_warning "$file 不存在，跳过复制"
+            echo "$file 不存在，跳过复制"
         fi
     done
 fi
 
-# 步骤14: 应用 patch_linux 并替换 Image
-if [ "$KPM" = "true" ]; then
-    print_info "应用 patch_linux 并替换 Image..."
-    cd $WORKSPACE/kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/dist
-    curl -LO https://raw.githubusercontent.com/Numbersf/Action-Build/main/patch_linux
-    chmod +x patch_linux
-    ./patch_linux
-    rm -f Image
-    mv oImage Image
-    cp Image $WORKSPACE/AnyKernel3/Image
-fi
+# 步骤17: 应用 patch_linux 并替换 Image（对应Apply patch_linux and replace Image步骤）
+print_info "应用 patch_linux 并替换 Image..."
+cd $WORKSPACE/kernel_workspace/kernel_platform/out/msm-kernel-$CPUD-$BUILD_METHOD/dist
+curl -LO --retry 5 --retry-delay 2 --retry-connrefused https://raw.githubusercontent.com/Numbersf/Action-Build/main/patchs/patch_linux
+chmod +x patch_linux
+./patch_linux
+rm -f Image
+mv oImage Image
+cp Image $WORKSPACE/AnyKernel3/Image
 
-# 步骤15: 下载 SUSFS 模块
+# 步骤18: 下载 SUSFS 模块（对应Download Latest SUSFS Module from CI/Release步骤）
 print_info "下载SUSFS模块..."
 cd $WORKSPACE
 
 if [ "$SUSFS_CI" = "true" ]; then
     print_info "从CI下载最新的SUSFS模块..."
     
-    # 获取GitHub个人访问令牌
-    echo "请输入您的GitHub个人访问令牌（如果没有，请访问 https://github.com/settings/tokens 创建一个）:"
-    read -s GITHUB_TOKEN
-    
-    LATEST_RUN_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
-        "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs?status=success" | \
-        jq -r '.workflow_runs[] | select(.head_branch == "v1.5.2+") | .id' | head -n 1)
-    
-    if [ -z "$LATEST_RUN_ID" ]; then
-        print_error "未找到分支v1.5.2+的成功运行"
-        print_info "尝试从Release下载SUSFS模块..."
-        wget https://github.com/sidex15/ksu_module_susfs/releases/latest/download/ksu_module_susfs_1.5.2+.zip
-        cp ksu_module_susfs_1.5.2+.zip ./AnyKernel3/
+    # 检查是否设置了GITHUB_TOKEN环境变量
+    if [ -z "$GITHUB_TOKEN" ]; then
+        print_warning "未设置GITHUB_TOKEN环境变量，尝试从Release下载..."
+        wget -O ksu_module_susfs_1.5.2+_Release.zip https://github.com/sidex15/ksu_module_susfs/releases/latest/download/ksu_module_susfs_1.5.2+.zip
+        cp ksu_module_susfs_1.5.2+_Release.zip ./AnyKernel3/
     else
+        LATEST_RUN_ID=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs?status=success" | \
+            jq -r '.workflow_runs[] | select(.head_branch == "v1.5.2+") | .id' | head -n 1)
+
+        if [ -z "$LATEST_RUN_ID" ]; then
+            echo "No successful run found for branch v1.5.2+"
+            exit 1
+        fi
+
         ARTIFACT_URL=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
             "https://api.github.com/repos/sidex15/susfs4ksu-module/actions/runs/$LATEST_RUN_ID/artifacts" | jq -r '.artifacts[0].archive_download_url')
-        
-        curl -L -H "Authorization: Bearer $GITHUB_TOKEN" -o ksu_module_susfs.zip "$ARTIFACT_URL"
-        cp ksu_module_susfs.zip ./AnyKernel3/
+
+        curl -L -H "Authorization: Bearer $GITHUB_TOKEN" -o ksu_module_susfs_1.5.2+_CI.zip "$ARTIFACT_URL"
+        cp ksu_module_susfs_1.5.2+_CI.zip ./AnyKernel3/
     fi
 else
     print_info "从Release下载最新的SUSFS模块..."
-    wget https://github.com/sidex15/ksu_module_susfs/releases/latest/download/ksu_module_susfs_1.5.2+.zip
-    cp ksu_module_susfs_1.5.2+.zip ./AnyKernel3/
+    wget -O ksu_module_susfs_1.5.2+_Release.zip https://github.com/sidex15/ksu_module_susfs/releases/latest/download/ksu_module_susfs_1.5.2+.zip
+    cp ksu_module_susfs_1.5.2+_Release.zip ./AnyKernel3/
 fi
 
-# 步骤16: 设置后缀并创建最终ZIP
-print_info "设置后缀并创建最终ZIP..."
-cd $WORKSPACE
-
-# 设置后缀
-SUFFIX=""
-if [ "$KPM" = "true" ]; then
-    SUFFIX="${SUFFIX}_KPM"
-fi
+# 步骤19: 设置zip后缀（对应Set zip suffix步骤）
+print_info "设置zip后缀..."
+SUFFIX_VALUE=""
 if [ "$VFS" = "true" ]; then
-    SUFFIX="${SUFFIX}_VFS"
+    SUFFIX_VALUE="${SUFFIX_VALUE}_VFS"
 fi
 if [ "$ZRAM" = "true" ]; then
-    SUFFIX="${SUFFIX}_LZ4KD"
+    SUFFIX_VALUE="${SUFFIX_VALUE}_LZ4KD"
 fi
 
-# 清理FEIL名称
-FEIL_CLEAN="${FEIL}"
-FEIL_CLEAN="${FEIL_CLEAN%_v}"  # 去掉结尾的 _v（如果有）
-FEIL_CLEAN="${FEIL_CLEAN%_u}"  # 去掉结尾的 _u（如果有）
-FEIL_CLEAN="${FEIL_CLEAN%_t}"  # 去掉结尾的 _t（如果有）
+# 步骤20: 自动映射FEIL到Android版本（对应Auto map FEIL to Android version by manifest步骤）
+print_info "自动映射FEIL到Android版本..."
+cd $WORKSPACE/kernel_workspace
+feil="$FEIL"
+cpu="$CPU"
+xml=".repo/manifests/${feil}.xml"
 
-# 创建最终ZIP
+if [ ! -f "$xml" ]; then
+    echo "Manifest $xml not found, attempting to download from branch oneplus/$cpu..."
+    mkdir -p .repo/manifests
+    git clone --depth=1 --branch oneplus/$cpu https://github.com/OnePlusOSS/kernel_manifest.git repo_tmp || {
+        echo "Failed to clone branch oneplus/$cpu"
+        feil_clean_value="${feil}_AndroidUnknown"
+    }
+
+    if [ -f "repo_tmp/${feil}.xml" ]; then
+        mv "repo_tmp/${feil}.xml" "$xml"
+    else
+        echo "Manifest file ${feil}.xml not found in branch oneplus/$cpu"
+        feil_clean_value="${feil}_AndroidUnknown"
+        rm -rf repo_tmp
+    fi
+    rm -rf repo_tmp
+fi
+
+if [ -f "$xml" ]; then
+    echo "Manifest $xml found."
+
+    # 去掉末尾的 _x（只删一次）
+    feil_base=$(echo "$feil" | sed -E 's/_[a-z]$//')
+
+    # 提取 revision 并解析 Android 版本
+    revision_full=$(grep -oP '<project[^>]*name="android_kernel[^"]*"[^>]*revision="\K[^"]+' "$xml" | head -n1 || true)
+
+    if [ -n "$revision_full" ]; then
+        android_ver=$(echo "$revision_full" | grep -oP '_v?_?\K([0-9]+\.[0-9]+(?:\.[0-9]+)?)' || true)
+        if [ -n "$android_ver" ]; then
+            feil_clean_value="${feil_base}_Android${android_ver}"
+        else
+            feil_clean_value="${feil_base}_AndroidUnknown"
+        fi
+    else
+        feil_clean_value="${feil_base}_AndroidUnknown"
+    fi
+else
+    feil_clean_value="${feil}_AndroidUnknown"
+fi
+
+# 步骤21: 创建最终ZIP（对应Upload AnyKernel3步骤的命名逻辑）
+print_info "创建最终ZIP..."
 cd $WORKSPACE/AnyKernel3
-zip -r9 ../AnyKernel3_SukiSUUltra_${KSU_VERSION}_${FEIL_CLEAN}_${SUFFIX}.zip *
+zip -r9 ../AnyKernel3_SukiSUUltra_${KSUVER}_${feil_clean_value}_KPM${SUFFIX_VALUE}.zip *
 
 print_success "构建完成！"
-print_success "输出文件: $WORKSPACE/AnyKernel3_SukiSUUltra_${KSU_VERSION}_${FEIL_CLEAN}_${SUFFIX}.zip"
+print_success "输出文件: $WORKSPACE/AnyKernel3_SukiSUUltra_${KSUVER}_${feil_clean_value}_KPM${SUFFIX_VALUE}.zip"
